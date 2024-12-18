@@ -1810,6 +1810,7 @@ contains
                                                snowFlux, seaIceFreshWaterFlux, icebergFreshWaterFlux, &
                                                seaIceSalinityFlux, &
                                                riverRunoffFlux, iceRunoffFlux, &
+                                               atmosphericTbot, & 
                                                removedRiverRunoffFlux, removedIceRunoffFlux, &
                                                shortWaveHeatFlux, rainFlux, &
                                                atmosphericPressure, iceFraction, &
@@ -1916,6 +1917,7 @@ contains
       call mpas_pool_get_field(forcingPool, 'icebergFreshWaterFlux', icebergFreshWaterFluxField)
       call mpas_pool_get_field(forcingPool, 'seaIceSalinityFlux', seaIceSalinityFluxField)
       call mpas_pool_get_field(forcingPool, 'riverRunoffFlux', riverRunoffFluxField)
+      call mpas_pool_get_array(forcingPool, 'atmosphericTbot', atmosphericTbot)
       call mpas_pool_get_field(forcingPool, 'iceRunoffFlux', iceRunoffFluxField)
       call mpas_pool_get_field(forcingPool, 'shortWaveHeatFlux', shortWaveHeatFluxField)
       call mpas_pool_get_field(forcingPool, 'rainFlux', rainFluxField)
@@ -1957,6 +1959,7 @@ contains
       icebergFreshWaterFlux => icebergFreshWaterFluxField % array
       seaIceSalinityFlux => seaIceSalinityFluxField % array
       riverRunoffFlux => riverRunoffFluxField % array
+      atmosphericTbot >= atmosphericTbot % array 
       iceRunoffFlux => iceRunoffFluxField % array
       shortWaveHeatFlux => shortWaveHeatFluxField % array
       rainFlux => rainFluxField % array
@@ -2123,8 +2126,11 @@ contains
            seaIceSalinityFlux(i) = x2o_o % rAttr(index_x2o_Fioi_salt, n)
         end if
         if ( riverRunoffFluxField % isActive ) then
-           !riverRunoffFlux(i) = x2o_o % rAttr(index_x2o_Foxx_rofl, n)
-           riverRunoffFlux(i) = 0.0_RKIND
+           riverRunoffFlux(i) = x2o_o % rAttr(index_x2o_Foxx_rofl, n)
+           ! Pass the atmospheric temperature at the lowest level to prescribe river temperature
+           atmosphericTBot(i) = (x2o_o % rAttr(index_x2o_Sa_tbot, n)) - 273.15
+           ! Option to set all river fluxes to zero for debugging 
+           !riverRunoffFlux(i) = 0.0_RKIND
            if (config_remove_ais_river_runoff) then
               if (latCell(i) < -1.04719666667_RKIND) then ! 60S in radians
                  removedRiverRunoffFlux(i) = riverRunoffFlux(i)

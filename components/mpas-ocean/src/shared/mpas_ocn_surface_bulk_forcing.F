@@ -368,7 +368,7 @@ contains
       integer :: iCell, nCells
 
       real (kind=RKIND), dimension(:), pointer :: evaporationFlux, snowFlux
-      real (kind=RKIND), dimension(:), pointer :: seaIceFreshWaterFlux, icebergFreshWaterFlux, riverRunoffFlux, iceRunoffFlux
+      real (kind=RKIND), dimension(:), pointer :: seaIceFreshWaterFlux, icebergFreshWaterFlux, riverRunoffFlux, atmosphericTbot, iceRunoffFlux
       real (kind=RKIND), dimension(:), pointer :: rainFlux
 
       err = 0
@@ -382,6 +382,7 @@ contains
       call mpas_pool_get_array(forcingPool, 'seaIceFreshWaterFlux', seaIceFreshWaterFlux)
       call mpas_pool_get_array(forcingPool, 'icebergFreshWaterFlux', icebergFreshWaterFlux)
       call mpas_pool_get_array(forcingPool, 'riverRunoffFlux', riverRunoffFlux)
+      call mpas_pool_get_array(forcingPool, 'atmosphericTbot', atmosphericTbot)
       call mpas_pool_get_array(forcingPool, 'iceRunoffFlux', iceRunoffFlux)
       call mpas_pool_get_array(forcingPool, 'rainFlux', rainFlux)
 
@@ -613,9 +614,13 @@ contains
                                                   totalFreshWaterTemperatureFlux
       real (kind=RKIND), dimension(:), pointer :: landIcePressure
       real (kind=RKIND) :: requiredSalt, allowedSalt, surfaceTemperatureFluxWithoutRunoff
+      
+      character (len=StrKIND), pointer :: config_rivertemp_method
 
       err = 0
 
+      ! Get config option for river temperature 
+      call mpas_pool_get_config(domain % configs, 'config_rivertemp_method', config_rivertemp_method)
       call mpas_pool_get_dimension(meshPool, 'nCellsArray', nCellsArray)
 
       call mpas_pool_get_subpool(forcingPool, 'tracersSurfaceFlux',tracersSurfaceFluxPool)
@@ -704,10 +709,19 @@ contains
            rainTemperatureFlux(iCell) = rainFlux(iCell) * tracerGroup(index_temperature_flux,minLevelCell(iCell),iCell) / rho_sw
            evapTemperatureFlux(iCell) = evaporationFlux(iCell) * tracerGroup(index_temperature_flux,minLevelCell(iCell),iCell) / rho_sw
 
-           ! Runoff can only have a minimum temperature of 0.0C, since it is fresh water.
-           tracersSurfaceFluxRunoff(index_temperature_flux,iCell) = riverRunoffFlux(iCell) &
-                      * max(tracerGroup(index_temperature_flux,minLevelCell(iCell),iCell), 0.0_RKIND) / rho_sw
+           ! Select river temperature based on nearest neighbor SST
+           if config_rivertemp_method == 'nearestsst'
+              ! Runoff can only have a minimum temperature of 0.0C, since it is fresh water.
+              tracersSurfaceFluxRunoff(index_temperature_flux,iCell) = riverRunoffFlux(iCell) &
+                          * max(tracerGroup(index_temperature_flux,minLevelCell(iCell),iCell), 0.0_RKIND) / rho_sw
+           end if
 
+           ! Modify to set river temperatures to bottom level air temp from coupler. Clamp at 30C to prevent
+           ! model from running too hot. 
+           if config_rivertemp_method == 'atmosphericTbot'
+              tracersSurfaceFluxRunoff(index_temperature_flux,iCell) = riverRunoffFlux(iCell) &
+                      * max(atmosphericTbot(index_temperature_flux,minLevelCell(iCell),iCell), 0.0_RKIND, 30.0) / rho_sw
+           end if
            ! Accumulate fluxes that use the freezing point
 ! mrp performance note: should call ocn_freezing_temperature just once here
            seaIceTemperatureFlux(iCell) = seaIceFreshWaterFlux(iCell) * &

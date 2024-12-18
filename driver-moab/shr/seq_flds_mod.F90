@@ -729,6 +729,7 @@ contains
     call seq_flds_add(a2x_states,"Sa_tbot")
     call seq_flds_add(x2l_states,"Sa_tbot")
     call seq_flds_add(x2i_states,"Sa_tbot")
+    call seq_flds_add(x2o_states,"Sa_tbot") !Added by D.S. for coupler to ocean
     if (rof_heat) then
        call seq_flds_add(x2r_states,"Sa_tbot")
        call seq_flds_add(a2x_states_to_rof,"Sa_tbot")
