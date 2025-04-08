@@ -83,4 +83,5 @@ my @groups = qw(run_modes
                 am_sedimenttransport
                 am_harmonicanalysis
                 am_conservationcheck
+                am_discretevariancedecay
                 );

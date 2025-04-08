@@ -34,6 +34,7 @@ MEMBERS = mpas_ocn_global_stats.o \
           mpas_ocn_sediment_flux_index.o\
           mpas_ocn_sediment_transport.o\
           mpas_ocn_harmonic_analysis.o \
+          mpas_ocn_discrete_variance_decay.o\
           mpas_ocn_conservation_check.o
 
 all: $(OBJS)
