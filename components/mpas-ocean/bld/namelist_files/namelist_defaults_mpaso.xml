@@ -1318,4 +1318,11 @@
 <config_AM_conservationCheck_write_to_logfile>.true.</config_AM_conservationCheck_write_to_logfile>
 <config_AM_conservationCheck_restart_stream>'conservationCheckRestart'</config_AM_conservationCheck_restart_stream>
 
+<!-- AM_discreteVarianceDecay -->
+<config_AM_discreteVarianceDecay_enable>.false.</config_AM_discreteVarianceDecay_enable>
+<config_AM_discreteVarianceDecay_compute_interval>'output_interval'</config_AM_discreteVarianceDecay_compute_interval>
+<config_AM_discreteVarianceDecay_output_stream>'discreteVarianceDecayOutput'</config_AM_discreteVarianceDecay_output_stream>
+<config_AM_discreteVarianceDecay_compute_on_startup>.false.</config_AM_discreteVarianceDecay_compute_on_startup>
+<config_AM_discreteVarianceDecay_write_on_startup>.false.</config_AM_discreteVarianceDecay_write_on_startup>
+
 </namelist_defaults>

@@ -1244,3 +1244,14 @@ add_default($nl, 'config_AM_conservationCheck_write_on_startup');
 add_default($nl, 'config_AM_conservationCheck_write_to_logfile');
 add_default($nl, 'config_AM_conservationCheck_restart_stream');
 
+########################################
+# Namelist group: AM_discreteVarianceDecay #
+########################################
+
+add_default($nl, 'config_AM_discreteVarianceDecay_enable');
+add_default($nl, 'config_AM_discreteVarianceDecay_compute_interval');
+add_default($nl, 'config_AM_discreteVarianceDecay_output_stream');
+add_default($nl, 'config_AM_discreteVarianceDecay_compute_on_startup');
+add_default($nl, 'config_AM_discreteVarianceDecay_write_on_startup');
+add_default($nl, 'config_AM_discreteVarianceDecay_write_to_logfile');
+add_default($nl, 'config_AM_discreteVarianceDecay_restart_stream');
