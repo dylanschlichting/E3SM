@@ -6748,4 +6748,46 @@ Valid values: A restart stream with state of the conservation check.
 Default: Defined in namelist_defaults.xml
 </entry>
 
+<!-- AM_discreteVarianceDecay -->
+<entry id="config_AM_discreteVarianceDecay_enable" type="logical"
+	category="AM_discreteVarianceDecay" group="AM_discreteVarianceDecay">
+If true, ocean analysis member discreteVarianceDecay  is called.
+
+Valid values: true or false
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_AM_discreteVarianceDecay_compute_interval" type="char*1024"
+	category="AM_discreteVarianceDecay" group="AM_discreteVarianceDecay">
+Timestamp determining how often analysis member computation should be performed.
+
+Valid values: Any valid time stamp, 'dt', or 'output_interval'
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_AM_discreteVarianceDecay_output_stream" type="char*1024"
+	category="AM_discreteVarianceDecay" group="AM_discreteVarianceDecay">
+
+Name of the stream that the discreteVarianceDecay analysis member should be tied to.
+
+Valid values: Any existing stream name or 'none'
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_AM_discreteVarianceDecay_compute_on_startup" type="logical"
+	category="AM_discreteVarianceDecay" group="AM_discreteVarianceDecay">
+Logical flag determining if an analysis member computation occurs on start-up.
+
+Valid values: true or false
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_AM_discreteVarianceDecay_write_on_startup" type="logical"
+	category="AM_discreteVarianceDecay" group="AM_discreteVarianceDecay">
+Logical flag determining if an analysis member write occurs on start-up.
+
+Valid values: true or false
+Default: Defined in namelist_defaults.xml
+</entry>
+
 </namelist_definition>

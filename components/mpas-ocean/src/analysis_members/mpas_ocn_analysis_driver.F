@@ -55,6 +55,7 @@ module ocn_analysis_driver
    use ocn_sediment_transport
    use ocn_harmonic_analysis
    use ocn_conservation_check
+   use ocn_discrete_variance_decay
 !   use ocn_TEM_PLATE
 
    implicit none
@@ -208,6 +209,7 @@ contains
       call mpas_pool_add_config(analysisMemberList, 'sedimentTransport', 1)
       call mpas_pool_add_config(analysisMemberList, 'harmonicAnalysis', 1)
       call mpas_pool_add_config(analysisMemberList, 'conservationCheck', 1)
+      call mpas_pool_add_config(analysisMemberList, 'discreteVarianceDecay', 1)
 !     call mpas_pool_add_config(analysisMemberList, 'temPlate', 1)
 
       ! DON'T EDIT BELOW HERE
@@ -1234,6 +1236,8 @@ contains
          call ocn_init_moc_streamfunction(domain, err_tmp)
       else if ( analysisMemberName(1:nameLength) == 'oceanHeatContent' ) then
          call ocn_init_ocean_heat_content(domain, err_tmp)
+      else if ( analysisMemberName(1:nameLength) == 'discreteVarianceDecay' ) then
+         call ocn_init_discrete_variance_decay(domain, err_tmp)   
       else if ( analysisMemberName(1:nameLength) == 'mixedLayerHeatBudget' ) then
          call ocn_init_mixed_layer_heat_budget(domain,err_tmp)
       else if ( analysisMemberName(1:nameLength) == 'sedimentFluxIndex' ) then
@@ -1369,6 +1373,8 @@ contains
          call ocn_compute_moc_streamfunction(domain, timeLevel, err_tmp)
       else if ( analysisMemberName(1:nameLength) == 'oceanHeatContent' ) then
          call ocn_compute_ocean_heat_content(domain, timeLevel, err_tmp)
+      else if ( analysisMemberName(1:nameLength) == 'discreteVarianceDecay' ) then
+         call ocn_compute_discrete_variance_decay(domain, timeLevel, err_tmp)
       else if ( analysisMemberName(1:nameLength) == 'mixedLayerHeatBudget' ) then
          call ocn_compute_mixed_layer_heat_budget(domain, timeLevel, err_tmp)
       else if ( analysisMemberName(1:nameLength) == 'sedimentFluxIndex' ) then
@@ -1478,6 +1484,8 @@ contains
          call ocn_restart_moc_streamfunction(domain, err_tmp)
       else if ( analysisMemberName(1:nameLength) == 'oceanHeatContent' ) then
          call ocn_restart_ocean_heat_content(domain, err_tmp)
+      else if ( analysisMemberName(1:nameLength) == 'discreteVarianceDecay' ) then
+         call ocn_restart_discrete_variance_decay(domain, err_tmp)
       else if ( analysisMemberName(1:nameLength) == 'mixedLayerHeatBudget' ) then
          call ocn_restart_mixed_layer_heat_budget(domain, err_tmp)
       else if ( analysisMemberName(1:nameLength) == 'sedimentFluxIndex' ) then
@@ -1581,6 +1589,8 @@ contains
          call ocn_finalize_moc_streamfunction(domain, err_tmp)
       else if ( analysisMemberName(1:nameLength) == 'oceanHeatContent' ) then
          call ocn_finalize_ocean_heat_content(domain,err_tmp)
+      else if ( analysisMemberName(1:nameLength) == 'discreteVarianceDecay' ) then
+         call ocn_finalize_discrete_variance_decay(domain,err_tmp)
       else if ( analysisMemberName(1:nameLength) == 'mixedLayerHeatBudget' ) then
          call ocn_finalize_mixed_layer_heat_budget(domain, err_tmp)
       else if ( analysisMemberName(1:nameLength) == 'sedimentFluxIndex' ) then
