@@ -190,14 +190,15 @@ module ocn_discrete_variance_decay
        real(kind=RKIND), pointer :: config_cvmix_background_diffusion
        real(kind=RKIND), allocatable :: vertDiffMid(:,:)
        real(kind=RKIND) :: backgroundDiff
-
+       real(kind=RKIND), dimension(:,:), allocatable :: tmp2D
+       real(kind=RKIND), dimension(:,:), allocatable :: sal2D
+       
        integer, dimension(:), pointer :: maxLevelCell, maxLevelEdgeTop, maxLevelVertexBot
        integer, pointer :: index_temperature, index_salinity, & 
-       nVertLevels, nCellsSolve, nEdgesSolve, nVerticesSolve
+       nVertLevels, nCells, nEdgesSolve, nVerticesSolve
        integer :: iTracer, k, iCell
 
        logical, pointer :: config_cvmix_background_diffusion_enable
-
 
        err = 0
  
@@ -207,64 +208,80 @@ module ocn_discrete_variance_decay
        do while (associated(block))
           call mpas_pool_get_subpool(block%structs, 'state', statePool)
           call mpas_pool_get_subpool(block%structs, 'mesh', meshPool)
-          call mpas_pool_get_subpool(statePool, 'tracers', tracersPool)
           call mpas_pool_get_subpool(block%structs, 'diagnostics', diagnosticsPool)
+          call mpas_pool_get_subpool(statePool, 'tracers', tracersPool)
           call mpas_pool_get_subpool(block%structs, 'discreteVarianceDecayAM', discreteVarianceDecayAMPool)
 
+          call mpas_pool_get_dimension(block%dimensions, 'nVertLevels', nVertLevels)
+          call mpas_pool_get_dimension(block%dimensions, 'nCells', nCells)
+
+          call mpas_pool_get_array(tracersPool, 'activeTracers', activeTracers, 1)
           call mpas_pool_get_dimension(tracersPool, 'index_temperature', index_temperature)
           call mpas_pool_get_dimension(tracersPool, 'index_salinity', index_salinity)
-          call mpas_pool_get_dimension(block%dimensions, 'nVertLevels', nVertLevels)
-          call mpas_pool_get_dimension(block%dimensions, 'nCellsSolve', nCellsSolve)
 
           call mpas_pool_get_array(meshPool, 'maxLevelCell', maxLevelCell)
           call mpas_pool_get_array(meshPool, 'maxLevelEdgeTop', maxLevelEdgeTop)
           call mpas_pool_get_array(meshPool, 'maxLevelVertexBot', maxLevelVertexBot)
           call mpas_pool_get_array(meshPool, 'bottomDepth', bottomDepth)
           call mpas_pool_get_array(meshPool, 'areaCell', areaCell)
-          call mpas_pool_get_array(tracersPool, 'activeTracers', activeTracers, timeLevel)
+
           call mpas_pool_get_array(diagnosticsPool, 'vertDiffTopOfCell', vertDiffTopOfCell)
           call mpas_pool_get_array(discreteVarianceDecayAMPool, 'chiPhyVerSalt', chiPhyVerSalt) 
           call mpas_pool_get_array(discreteVarianceDecayAMPool, 'chiPhyVerTemp', chiPhyVerTemp) 
 
           ! Interpolate vertical diffusivity from top of cell to middle of layer
-          do iCell = 1, nCellsSolve
+          allocate(vertDiffMid(nVertLevels-1, nCells))
+          do iCell = 1, nCells
              do k = 1, nVertLevels-1
                  vertDiffMid(k,iCell) = ( vertDiffTopOfCell(k,iCell) + vertDiffTopOfCell(k+1,iCell)) / 2.0d0
              end do
           end do
 
-          ! Computer vertical temperature gradient using EP AM
-          call computeVerticalDerivative(nCellsSolve, nVertLevels, & 
-                                         zMid, activeTracers(index_temperature,:,:), dTdz)
-          ! Computer vertical salinity gradient using EP AM
-          call computeVerticalDerivative(nCellsSolve, nVertLevels, & 
-                                         zMid, activeTracers(index_salinity,:,:), dsdz)
+          ! Computer vertical temperature gradient
+          ! Initialize temp, salt, and their derivatives
+          allocate(tmp2D(nCells, nVertLevels))
+          allocate(dTdz(nVertLevels, nCells))
+          tmp2D = activeTracers(index_temperature, :, :)
+          call computeVerticalDerivative(nCells, nVertLevels, zMid, & 
+                                         tmp2D, dTdz)
+
+          allocate(sal2D(nCells, nVertLevels))
+          allocate(dsdz(nVertLevels, nCells))
+          sal2D = activeTracers(index_salinity, :, :)
+          ! Computer vertical salinity gradient
+          call computeVerticalDerivative(nCells, nVertLevels, zMid, & 
+                                         sal2D, dsdz)
 
           ! Local estimates of vertical physical mixing 
-          do iCell = 1, nCellsSolve
+          do iCell = 1, nCells
               do k = 1, maxLevelCell(iCell)
-                  ! If background diffusion 
+                  ! Subtract background tracer diffusion if turned on  
                   if (config_cvmix_background_diffusion_enable) then
                      backgroundDiff = config_cvmix_background_diffusion 
                   else 
                      backgroundDiff = 0.0_RKIND
                   end if 
+                  ! Temperature 
+                  chiPhyVerTemp(k,iCell) = 2.0_RKIND * (vertDiffMid(k,iCell)-backgroundDiff) & 
+                  * ( (dTdz(k,iCell) * dTdz(k,iCell)) )
                   ! Salinity 
                   chiPhyVerSalt(k,iCell) = 2.0_RKIND * (vertDiffMid(k,iCell)-backgroundDiff) & 
                   * ( (dsdz(k,iCell) * dsdz(k,iCell)) )
-                  !Temperature 
-                  chiPhyVerTemp(k,iCell) = 2.0_RKIND * (vertDiffMid(k,iCell)-backgroundDiff) & 
-                  * ( (dTdz(k,iCell) * dTdz(k,iCell)) )
               end do
-          end do 
- 
-        !   do iCell = 1, nCellsSolve
+          end do
+          
+          ! Local estimates of horizontal physical mixing due to laplacian diffusion 
+          ! Local estimates of horizontal physical mixing due to biharmonic diffusion 
+          ! Local estimates of redi diffusion 
 
-         ! chi_spu 
-         ! A_c = 
-         ! chi_br08 = (A_c2) / dt
+          ! Local estimates of numerical mixing following Burchard & Rennau (2008) O.M.
+         ! AdvectedTracerSquared = 
+         ! SquareAdvectedTracer
+         ! chiSpurBR08 = (AdvectedTracerSquared-SquareAdvectedTracer) / config_dt
+
           block => block%next
        end do
+       deallocate(vertDiffMid)
  
     end subroutine ocn_compute_discrete_variance_decay!}}}
 
@@ -282,38 +299,38 @@ module ocn_discrete_variance_decay
  !>  number of vertical layers.
  !-----------------------------------------------------------------------
 
-    subroutine computeVerticalDerivative(nCellsSolve, nVertLevels, heightMid, field, derivativeField)
-      integer, intent(in) :: nCellsSolve, nVertLevels
+    subroutine computeVerticalDerivative(nCells, nVertLevels, heightMid, field, derivativeField)
+      integer, intent(in) :: nCells, nVertLevels
       real(kind=RKIND), dimension(:,:), intent(in) :: heightMid
       real(kind=RKIND), dimension(:,:), intent(in) :: field
       real(kind=RKIND), dimension(:,:), intent(out) :: derivativeField
-  
+      ! real(kind=RKIND), dimension(:,:), allocatable, intent(out) :: derivativeField
+
       integer :: iCell, kLayer
-      real(kind=RKIND) :: wrkAbove, wrkBelow, dz
       integer :: firstLayer, lastLayer
-  
+
+      real(kind=RKIND) :: wrkAbove, wrkBelow, dz
+
       ! Set firstLayer to always be 1, and lastLayer to always be nVertLevels
       firstLayer = 1
       lastLayer = nVertLevels  ! Treat lastLayer as constant across all cells
   
-      ! Initialize the derivativeField
-      derivativeField(nVertLevels, 1:nCellsSolve) = 0.0_RKIND
+      ! Initialize the derivativeField, note this is allocated before call time
+      ! otherwise you well get a memory seg fault
+      derivativeField = 0.0_RKIND
   
-      ! Loop over all cells to calculate the vertical derivative
-      do iCell = 1, nCellsSolve
+      do iCell = 1, nCells
           ! Calculate derivative at the first layer
           wrkAbove = field(firstLayer, iCell)
           wrkBelow = field(firstLayer + 1, iCell)
           dz = heightMid(firstLayer, iCell) - heightMid(firstLayer + 1, iCell)
-  
-          derivativeField(firstLayer, iCell) = (wrkAbove - wrkBelow) / dz
-  
+          derivativeField(firstLayer, iCell) = (wrkAbove - wrkBelow) / dz  
+
           ! Loop over intermediate layers
-          do kLayer = firstLayer + 1, lastLayer - 1
+          do kLayer = 2, lastLayer - 1
               wrkAbove = field(kLayer - 1, iCell)
               wrkBelow = field(kLayer + 1, iCell)
               dz = heightMid(kLayer - 1, iCell) - heightMid(kLayer + 1, iCell)
-  
               derivativeField(kLayer, iCell) = (wrkAbove - wrkBelow) / dz
           end do
   
