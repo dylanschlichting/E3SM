@@ -1268,14 +1268,6 @@ Valid values: Any positive real number
 Default: Defined in namelist_defaults.xml
 </entry>
 
-<entry id="config_use_sgr_opt_salt_prescribed" type="logical"
-	category="forcing" group="forcing">
-If true, subglacial runoff salinity is set to config_sgr_salinity_prescribed. If false, the salinity is set to 0 PSU.
-
-Valid values: .true. or .false.
-Default: Defined in namelist_defaults.xml
-</entry>
-
 <entry id="config_use_custom_river_fluxes" type="logical"
 	category="forcing" group="forcing">
 If true, replace riverRunoffFlux from the coupeler over a prescribed box.
