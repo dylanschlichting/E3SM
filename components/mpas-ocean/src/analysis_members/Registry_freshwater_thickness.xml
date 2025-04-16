@@ -31,10 +31,10 @@
 	<var name="riverTagTracer2FwThickness" type="real" dimensions="nCells Time" units="m"
 		description="Integrated riverTagTracer2 from surface to bottom"
 	/>
-	<var name="riverTagTracer1FwVolume" type="real" dimensions="nCells Time" units="m^3"
+	<var name="riverTagTracer1FwVolume" type="real" dimensions="Time" units="m^3"
 		description="Volume-integrated riverTagTracer1. Yields the freshwater volume."
 	/>
-	<var name="riverTagTracer2FwVolume" type="real" dimensions="nCells Time" units="m^3"
+	<var name="riverTagTracer2FwVolume" type="real" dimensions="Time" units="m^3"
 		description="Volume-integrated riverTagTracer2. Yields the freshwater volume."
 	/>
 	<var name="riverTagTracer1ZonalFwFlux" type="real" dimensions="nCells Time" units="m^2 s^-1"

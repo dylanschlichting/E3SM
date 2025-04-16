@@ -13,18 +13,21 @@
 !>        from the riverTagTracers.
 
 !> \author Dylan Schlichting
-!> \date   February 06, 2025, updated March 26, 2025
+!> \date   February 06, 2025, updated Apr 2025 
 !> \details
-!>   Computes freshwater thickness by depth-integrating river tracers
+!>   Computes freshwater thickness properties related to tagged river tracers
 !>   Details described in Zhang et al. 2012 JGR Oceans
 !>   https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2012JC008108
 !>   Returns a nCells x Time array for each river.
 !> 
-!>   fw_thickness = \int river_dye * dz
-!>   fw_volume = \iiint river_dye * dz
-!>   fw_u_flux = \int river_dye * u * dz
-!>   fw_v_flux = \int river_dye * v * dz
+!>   fw_thickness = \int river * dz
+!>   fw_volume = \iiint river * dz
+!>   fw_u_flux = \int river * u * dz
+!>   fw_v_flux = \int river * v * dz
 !>   The fluxes are used for plotting vectors on plan view plots of thickness.
+!>   The volume integral is calculated over the inner shelf (<100 m)
+!>   fw_volume = ∑_i ∑_k [ layerThickness(k, i) * areaCell(i) * tracer(river, k, i) ]
+!>             = ∭ tracer(x, y, z) dV  (discrete sum)
 !-----------------------------------------------------------------------
 
 module ocn_freshwater_thickness
@@ -37,7 +40,7 @@ module ocn_freshwater_thickness
 
    use ocn_constants
    use ocn_diagnostics_variables
-
+   
    implicit none
    private
    save
@@ -167,6 +170,7 @@ contains
       type(mpas_pool_type), pointer :: statePool
       type(mpas_pool_type), pointer :: meshPool
       type(mpas_pool_type), pointer :: tracersPool
+      type(mpas_pool_type), pointer :: diagnosticsPool   
 
       ! Here are some example variables which may be needed for your analysis member
       integer, pointer :: nVertLevels, nCellsSolve, nEdgesSolve, nVerticesSolve
@@ -176,11 +180,12 @@ contains
       real(kind=RKIND), dimension(:, :, :), pointer :: tracers, riverTagTracers
       real(kind=RKIND), dimension(:, :), pointer :: riverTagTracer1RiverRunoff, riverTagTracer2RiverRunoff
       real(kind=RKIND), dimension(:, :), pointer :: layerThickness, velocityZonal, velocityMeridional
-      real (kind=RKIND), dimension(:), pointer :: areaCell
+      real (kind=RKIND), dimension(:), pointer :: areaCell, bottomDepth
       real(kind=RKIND), dimension(:), pointer ::  riverTagTracer1FwThickness, riverTagTracer2FwThickness, & 
-                                                  riverTagTracer1FwVolume, riverTagTracer2FwVolume, &
                                                   riverTagTracer1ZonalFwFlux, riverTagTracer1MeridionalFwFlux, &
                                                   riverTagTracer2ZonalFwFlux, riverTagTracer2MeridionalFwFlux
+
+      real (kind=RKIND), pointer :: riverTagTracer1FwVolume, riverTagTracer2FwVolume
 
       real(kind=RKIND) :: freshwaterLayer_river1, freshwaterLayer_river2, &
                           freshwaterLayerVolume_river1, freshwaterLayerVolume_river2, &
@@ -197,12 +202,14 @@ contains
          call mpas_pool_get_subpool(block%structs, 'mesh', meshPool)
          call mpas_pool_get_subpool(statePool, 'tracers', tracersPool)
          call mpas_pool_get_subpool(block%structs, 'freshwaterThickness', freshwaterThicknessAMPool)
+         call mpas_pool_get_subpool(block%structs, 'diagnostics', diagnosticsPool)
          call mpas_pool_get_dimension(block%dimensions, 'nVertLevels', nVertLevels)
          call mpas_pool_get_dimension(block%dimensions, 'nCellsSolve', nCellsSolve)
 
          call mpas_pool_get_array(meshPool, 'maxLevelCell', maxLevelCell)
          call mpas_pool_get_array(meshPool, 'maxLevelEdgeTop', maxLevelEdgeTop)
          call mpas_pool_get_array(meshPool, 'maxLevelVertexBot', maxLevelVertexBot)
+         call mpas_pool_get_array(meshPool, 'bottomDepth', bottomDepth)
          call mpas_pool_get_array(meshPool, 'areaCell', areaCell)
          call mpas_pool_get_array(tracersPool, 'riverTagTracers', riverTagTracers, timeLevel)
          call mpas_pool_get_array(statePool, 'layerThickness', layerThickness, timeLevel)
@@ -214,13 +221,15 @@ contains
          call mpas_pool_get_array(freshwaterThicknessAMPool, 'riverTagTracer1MeridionalFwFlux', riverTagTracer1MeridionalFwFlux) 
          call mpas_pool_get_array(freshwaterThicknessAMPool, 'riverTagTracer2ZonalFwFlux', riverTagTracer2ZonalFwFlux) 
          call mpas_pool_get_array(freshwaterThicknessAMPool, 'riverTagTracer2MeridionalFwFlux', riverTagTracer2MeridionalFwFlux) 
+         call mpas_pool_get_array(diagnosticsPool, 'velocityMeridional', velocityMeridional)
+         call mpas_pool_get_array(diagnosticsPool, 'velocityZonal', velocityZonal)
 
          do iCell = 1, nCellsSolve
             k = 1
             riverTagTracer1FwThickness(iCell) = 0.0_RKIND
             riverTagTracer2FwThickness(iCell) = 0.0_RKIND
-            riverTagTracer1FwVolume(iCell) = 0.0_RKIND
-            riverTagTracer2FwVolume(iCell) = 0.0_RKIND
+            riverTagTracer1FwVolume = 0.0_RKIND
+            riverTagTracer2FwVolume = 0.0_RKIND
             riverTagTracer1ZonalFwFlux(iCell) = 0.0_RKIND
             riverTagTracer1MeridionalFwFlux(iCell) = 0.0_RKIND
             riverTagTracer2ZonalFwFlux(iCell) = 0.0_RKIND
@@ -234,13 +243,16 @@ contains
                riverTagTracer1FwThickness(iCell) = riverTagTracer1FwThickness(iCell) + freshwaterLayer_river1
                riverTagTracer2FwThickness(iCell) = riverTagTracer2FwThickness(iCell) + freshwaterLayer_river2
                
-               ! Freshwater volume in each layer > dye*dV, where dV = dA*dz
-               freshwaterLayerVolume_river1 = layerThickness(k, iCell)*areaCell(iCell)*riverTagTracers(1, k, iCell)
-               freshwaterLayerVolume_river2 = layerThickness(k, iCell)*areaCell(iCell)*riverTagTracers(2, k, iCell)
-               
-               ! Freshwater volume > \iiint dye*dV
-               riverTagTracer1FwVolume(iCell) = riverTagTracer1FwVolume(iCell)+freshwaterLayerVolume_river1
-               riverTagTracer2FwVolume(iCell) = riverTagTracer2FwVolume(iCell)+freshwaterLayerVolume_river2
+               ! Freshwater volume in each layer on inner shelf > dye*dV, where dV = dA*dz. Since it is a scalar and volume integral,
+               ! it is not a function of iCell, just time.
+               if (bottomDepth(iCell) .lt. 100.0_RKIND) then 
+                  freshwaterLayerVolume_river1 = layerThickness(k, iCell)*areaCell(iCell)*riverTagTracers(1, k, iCell)
+                  freshwaterLayerVolume_river2 = layerThickness(k, iCell)*areaCell(iCell)*riverTagTracers(2, k, iCell)
+                  
+                  ! Freshwater volume > \iiint dye*dV
+                  riverTagTracer1FwVolume = riverTagTracer1FwVolume+freshwaterLayerVolume_river1
+                  riverTagTracer2FwVolume = riverTagTracer2FwVolume+freshwaterLayerVolume_river2
+               end if
                
                ! Freshwater fluxes in each layer > dye*u*dz, dye*v*dz
                zonalFreshwaterFluxLayer_river1 = layerThickness(k, iCell)*riverTagTracers(1, k, iCell)*velocityZonal(k,iCell)
