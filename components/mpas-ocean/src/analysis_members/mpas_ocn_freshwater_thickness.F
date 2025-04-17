@@ -186,6 +186,8 @@ contains
                                                   riverTagTracer2ZonalFwFlux, riverTagTracer2MeridionalFwFlux
 
       real (kind=RKIND), pointer :: riverTagTracer1FwVolume, riverTagTracer2FwVolume
+      real (kind=RKIND) :: riverTagTracer1FwVolumeint, riverTagTracer2FwVolumeint
+
 
       real(kind=RKIND) :: freshwaterLayer_river1, freshwaterLayer_river2, &
                           freshwaterLayerVolume_river1, freshwaterLayerVolume_river2, &
@@ -195,6 +197,9 @@ contains
       err = 0
 
       dminfo = domain%dminfo
+
+      riverTagTracer1FwVolumeint = 0.0_RKIND
+      riverTagTracer2FwVolumeint = 0.0_RKIND
 
       block => domain%blocklist
       do while (associated(block))
@@ -228,11 +233,11 @@ contains
             k = 1
             riverTagTracer1FwThickness(iCell) = 0.0_RKIND
             riverTagTracer2FwThickness(iCell) = 0.0_RKIND
-            riverTagTracer1FwVolume = 0.0_RKIND
-            riverTagTracer2FwVolume = 0.0_RKIND
+
             riverTagTracer1ZonalFwFlux(iCell) = 0.0_RKIND
-            riverTagTracer1MeridionalFwFlux(iCell) = 0.0_RKIND
             riverTagTracer2ZonalFwFlux(iCell) = 0.0_RKIND
+
+            riverTagTracer1MeridionalFwFlux(iCell) = 0.0_RKIND
             riverTagTracer2MeridionalFwFlux(iCell) = 0.0_RKIND
             do while (k .le. maxLevelCell(iCell))
                ! Freshwater concentration in each layer > dye*dz
@@ -243,15 +248,16 @@ contains
                riverTagTracer1FwThickness(iCell) = riverTagTracer1FwThickness(iCell) + freshwaterLayer_river1
                riverTagTracer2FwThickness(iCell) = riverTagTracer2FwThickness(iCell) + freshwaterLayer_river2
                
-               ! Freshwater volume in each layer on inner shelf > dye*dV, where dV = dA*dz. Since it is a scalar and volume integral,
+               ! Freshwater volume in each layer on inner shelf > dye*dV, where dV = dA*dz. Since it is a volume integral,
                ! it is not a function of iCell, just time.
                if (bottomDepth(iCell) .lt. 100.0_RKIND) then 
                   freshwaterLayerVolume_river1 = layerThickness(k, iCell)*areaCell(iCell)*riverTagTracers(1, k, iCell)
                   freshwaterLayerVolume_river2 = layerThickness(k, iCell)*areaCell(iCell)*riverTagTracers(2, k, iCell)
                   
-                  ! Freshwater volume > \iiint dye*dV
-                  riverTagTracer1FwVolume = riverTagTracer1FwVolume+freshwaterLayerVolume_river1
-                  riverTagTracer2FwVolume = riverTagTracer2FwVolume+freshwaterLayerVolume_river2
+                  ! Freshwater volume in each processor> \iiint dye*dV
+                  riverTagTracer1FwVolumeint = riverTagTracer1FwVolumeint+freshwaterLayerVolume_river1
+                  print *, 'riverTagTracer1FwVolume is', riverTagTracer1FwVolumeint
+                  riverTagTracer2FwVolumeint = riverTagTracer2FwVolumeint+freshwaterLayerVolume_river2
                end if
                
                ! Freshwater fluxes in each layer > dye*u*dz, dye*v*dz
@@ -274,6 +280,10 @@ contains
 
          block => block%next
       end do
+      
+      ! Sum over all processors to get the volume integral 
+      call MPAS_dmpar_sum_real(domain % dminfo, riverTagTracer1FwVolumeint, riverTagTracer1FwVolume)
+      call MPAS_dmpar_sum_real(domain % dminfo, riverTagTracer2FwVolumeint, riverTagTracer2FwVolume)
 
    end subroutine ocn_compute_freshwater_thickness!}}}
 
