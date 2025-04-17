@@ -256,7 +256,6 @@ contains
                   
                   ! Freshwater volume in each processor> \iiint dye*dV
                   riverTagTracer1FwVolumeint = riverTagTracer1FwVolumeint+freshwaterLayerVolume_river1
-                  print *, 'riverTagTracer1FwVolume is', riverTagTracer1FwVolumeint
                   riverTagTracer2FwVolumeint = riverTagTracer2FwVolumeint+freshwaterLayerVolume_river2
                end if
                
