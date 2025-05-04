@@ -1264,6 +1264,8 @@ def buildnml(case, caseroot, compname):
             lines.append('    <var name="xtime"/>')
             lines.append('    <var name="chiPhyVerSalt"/>')
             lines.append('    <var name="chiPhyVerTemp"/>')
+            lines.append('    <var_array name="chiSpurHorzTracerBR08"/>')
+            lines.append('    <var_array name="chiSpurVertTracerBR08"/>')
             lines.append('</stream>')
             lines.append('')
             lines.append('<stream name="timeSeriesStatsDailyOutput"')

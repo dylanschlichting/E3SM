@@ -1156,8 +1156,8 @@ contains
 !  routine ocn_tracer_vmix_tend_implicit
 !
 !> \brief   Computes tendencies for implicit tracer vertical mixing
-!> \author  Mark Petersen
-!> \date    September 2011
+!> \author  Mark Petersen, Dylan Schlichting
+!> \date    September 2011, May 2025
 !> \details
 !>  This routine computes the tendencies for implicit vertical mixing for
 !>  tracers using computed coefficients.
@@ -1220,6 +1220,8 @@ contains
       err = 0
 
       if(.not.tracerVmixOn) return
+      ! Shut off vertical mixing for numerical mixing tracers
+      if (tracers == 'numericalMixingTracers') return
 
       num_tracers = size(tracers, dim=1)
 

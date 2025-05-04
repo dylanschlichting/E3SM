@@ -565,6 +565,19 @@ add_default($nl, 'config_salinity_restoring_max_difference');
 add_default($nl, 'config_salinity_restoring_under_sea_ice');
 
 ###############################################
+# Namelist group: tracer_forcing_numericalMixingTracers #
+###############################################
+
+add_default($nl, 'config_use_numericalMixingTracers');
+add_default($nl, 'config_use_numericalMixingTracers_surface_bulk_forcing');
+add_default($nl, 'config_use_numericalMixingTracers_surface_restoring');
+add_default($nl, 'config_use_numericalMixingTracers_interior_restoring');
+add_default($nl, 'config_use_numericalMixingTracers_exponential_decay');
+add_default($nl, 'config_use_numericalMixingTracers_idealAge_forcing');
+add_default($nl, 'config_use_numericalMixingTracers_ttd_forcing');
+
+
+###############################################
 # Namelist group: tracer_forcing_debugTracers #
 ###############################################
 

@@ -67,8 +67,8 @@ contains
 !  routine ocn_tracer_hmix_tend
 !
 !> \brief   Computes tendency term for horizontal tracer mixing
-!> \author  Doug Jacobsen, Mark Petersen, Todd Ringler
-!> \date    September 2011
+!> \author  Doug Jacobsen, Mark Petersen, Todd Ringler, Dylan Schlichting
+!> \date    September 2011, May 2025
 !> \details
 !>  This routine computes the horizontal mixing tendency for tracer
 !>  based on current state and user choices of mixing parameterization.
@@ -143,6 +143,8 @@ contains
       !-----------------------------------------------------------------
 
       if(.not.tracerHmixOn) return
+      ! Shut off horizontal mixing for numerical mixing tracers
+      if (tracers == 'numericalMixingTracers') return
 
       call mpas_timer_start("tracer hmix")
 

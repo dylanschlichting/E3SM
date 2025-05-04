@@ -132,6 +132,7 @@ contains
         err = 0
 
         if (.not. surfaceThicknessFluxOn .and. .not. surfaceTracerFluxOn) return
+        if (tracers == 'numericalMixingTracers') return
 
         if (present(timeLevelIn)) then
            timeLevel = timeLevelIn

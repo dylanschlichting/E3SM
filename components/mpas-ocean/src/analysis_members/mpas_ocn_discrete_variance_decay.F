@@ -45,6 +45,7 @@ module ocn_discrete_variance_decay
     use ocn_constants
     use ocn_diagnostics_variables
     use ocn_vmix
+    use ocn_tracer_advection_mono
  
     implicit none
     private
@@ -180,12 +181,28 @@ module ocn_discrete_variance_decay
 
        real(kind=RKIND), dimension(:,:,:), pointer :: activeTracers
        real(kind=RKIND), dimension(:,:,:), pointer :: tracers
+       real(kind=RKIND), dimension(:,:,:), allocatable :: activeTracersSquared
+       real(kind=RKIND), dimension(:,:,:), allocatable :: squareAdvectedHorzTracer
+       real(kind=RKIND), dimension(:,:,:), allocatable :: squareAdvectedVertTracer
+
+       real(kind=RKIND), dimension(:,:,:), pointer :: chiSpurHorzTracerBR08, chiSpurVertTracerBR08
+
+       ! pointers for tendencies used in diagnostic budget computation, A{c}
+       real (kind=RKIND), dimension(:,:,:), pointer, contiguous :: &
+             activeTracerHorizontalAdvectionTendency, &
+             activeTracerVerticalAdvectionTendency,   &
+             activeTracerHorizontalAdvectionTendencySquared, &
+             activeTracerVerticalAdvectionTendencySquared
+       
+      real (kind=RKIND), dimension(:,:,:), pointer, contiguous :: &
+             activeTracerSquaredHorizontalAdvectionTendency, &
+             activeTracerSquaredVerticalAdvectionTendency
  
        ! Here are some example variables which may be needed for your analysis member
        real(kind=RKIND), dimension(:,:), pointer :: dTdz
        real(kind=RKIND), dimension(:,:), pointer :: dsdz
        real(kind=RKIND), dimension(:,:), pointer :: vertDiffTopOfCell
-       real(kind=RKIND), dimension(:, :), pointer :: chiPhyVerSalt, chiPhyVerTemp
+       real(kind=RKIND), dimension(:,:), pointer :: chiPhyVerSalt, chiPhyVerTemp
        real(kind=RKIND), dimension(:), pointer :: areaCell, bottomDepth
        real(kind=RKIND), pointer :: config_cvmix_background_diffusion
        real(kind=RKIND), allocatable :: vertDiffMid(:,:)
@@ -199,17 +216,29 @@ module ocn_discrete_variance_decay
        integer :: iTracer, k, iCell
 
        logical, pointer :: config_cvmix_background_diffusion_enable
+       logical :: computeBudgets  = .false.
+
+       character(len=StrKIND), pointer :: config_dt
+       type (MPAS_timeInterval_type) :: timeStepESMF
+       real (kind=RKIND) :: dt,
 
        err = 0
  
        dminfo = domain%dminfo
+
+       call mpas_pool_get_config(configs, 'config_dt', config_dt)
+       call mpas_set_timeInterval(timeStepESMF, timeString=config_dt,ierr=err)
+       print *, 'dt = ', dt
+       
  
        block => domain%blocklist
        do while (associated(block))
+          
           call mpas_pool_get_subpool(block%structs, 'state', statePool)
           call mpas_pool_get_subpool(block%structs, 'mesh', meshPool)
           call mpas_pool_get_subpool(block%structs, 'diagnostics', diagnosticsPool)
           call mpas_pool_get_subpool(statePool, 'tracers', tracersPool)
+          call mpas_pool_get_array(statePool, 'layerThickness', layerThickness, timeLevel)
           call mpas_pool_get_subpool(block%structs, 'discreteVarianceDecayAM', discreteVarianceDecayAMPool)
 
           call mpas_pool_get_dimension(block%dimensions, 'nVertLevels', nVertLevels)
@@ -228,6 +257,19 @@ module ocn_discrete_variance_decay
           call mpas_pool_get_array(diagnosticsPool, 'vertDiffTopOfCell', vertDiffTopOfCell)
           call mpas_pool_get_array(discreteVarianceDecayAMPool, 'chiPhyVerSalt', chiPhyVerSalt) 
           call mpas_pool_get_array(discreteVarianceDecayAMPool, 'chiPhyVerTemp', chiPhyVerTemp) 
+         !  if (config_use_br08_spur) then
+         call mpas_pool_get_array(discreteVarianceDecayAMPool, 'chiSpurHorzTracerBR08', chiSpurHorzTracerBR08) 
+         call mpas_pool_get_array(discreteVarianceDecayAMPool, 'chiSpurVertTracerBR08', chiSpurVertTracerBR08) 
+         !  end if 
+          !  if (config_use_k14)
+         !  call mpas_pool_get_array(discreteVarianceDecayAMPool, 'chiSpurHorzTracerK14', chiSpurHorzTracerK14) 
+         !  call mpas_pool_get_array(discreteVarianceDecayAMPool, 'chiSpurVertTracerK14', chiSpurVertTracerK14) 
+          
+          ! Variables needed for numerical mixing
+          call mpas_pool_get_array(diagnosticsPool, 'activeTracerHorizontalAdvectionTendency', &
+                                   activeTracerHorizontalAdvectionTendency)
+          call mpas_pool_get_array(diagnosticsPool, 'activeTracerVerticalAdvectionTendency',  &
+                                   activeTracerVerticalAdvectionTendency)
 
           ! Interpolate vertical diffusivity from top of cell to middle of layer
           allocate(vertDiffMid(nVertLevels-1, nCells))
@@ -239,14 +281,14 @@ module ocn_discrete_variance_decay
 
           ! Computer vertical temperature gradient
           ! Initialize temp, salt, and their derivatives
-          allocate(tmp2D(nCells, nVertLevels))
-          allocate(dTdz(nVertLevels, nCells))
+          allocate(tmp2D(nVertLevels,nCells))
+          allocate(dTdz(nVertLevels,nCells))
           tmp2D = activeTracers(index_temperature, :, :)
           call computeVerticalDerivative(nCells, nVertLevels, zMid, & 
                                          tmp2D, dTdz)
 
-          allocate(sal2D(nCells, nVertLevels))
-          allocate(dsdz(nVertLevels, nCells))
+          allocate(sal2D(nVertLevels,nCells))
+          allocate(dsdz(nVertLevels,nCells))
           sal2D = activeTracers(index_salinity, :, :)
           ! Computer vertical salinity gradient
           call computeVerticalDerivative(nCells, nVertLevels, zMid, & 
@@ -256,11 +298,7 @@ module ocn_discrete_variance_decay
           do iCell = 1, nCells
               do k = 1, maxLevelCell(iCell)
                   ! Subtract background tracer diffusion if turned on  
-                  if (config_cvmix_background_diffusion_enable) then
-                     backgroundDiff = config_cvmix_background_diffusion 
-                  else 
-                     backgroundDiff = 0.0_RKIND
-                  end if 
+                  backgroundDiff = config_cvmix_background_diffusion 
                   ! Temperature 
                   chiPhyVerTemp(k,iCell) = 2.0_RKIND * (vertDiffMid(k,iCell)-backgroundDiff) & 
                   * ( (dTdz(k,iCell) * dTdz(k,iCell)) )
@@ -274,14 +312,64 @@ module ocn_discrete_variance_decay
           ! Local estimates of horizontal physical mixing due to biharmonic diffusion 
           ! Local estimates of redi diffusion 
 
-          ! Local estimates of numerical mixing following Burchard & Rennau (2008) O.M.
-         ! AdvectedTracerSquared = 
-         ! SquareAdvectedTracer
-         ! chiSpurBR08 = (AdvectedTracerSquared-SquareAdvectedTracer) / config_dt
+          ! Local estimates of numerical mixing following Burchard & Rennau (2008) O.M.,
+          ! (A{c^2} - (A{c})^2) / dt. Split into horizontal and vertical components, 
+          ! Calculate (A{c})^2) first because it is already computed at run time.
+         !  if (config_use_br08_spur) then 
+         !  allocate(squareAdvectedHorzTracer(size(activeTracerHorizontalAdvectionTendency,1), size(activeTracerHorizontalAdvectionTendency,2), size(activeTracerHorizontalAdvectionTendency,3)))
+         !  allocate(squareAdvectedVertTracer(size(activeTracerVerticalAdvectionTendency,1), size(activeTracerVerticalAdvectionTendency,2), size(activeTracerVerticalAdvectionTendency,3)))
+          
+         !  squareAdvectedHorzTracer(1,:,:) = activeTracerHorizontalAdvectionTendency(1,:,:)*activeTracerHorizontalAdvectionTendency(1,:,:)
+         !  squareAdvectedVertTracer(1,:,:) = activeTracerVerticalAdvectionTendency(1,:,:)*activeTracerVerticalAdvectionTendency(1,:,:)
 
+         ! !  print *, 'Surface horizontal advected temperature**2', activeTracerHorizontalAdvectionTendency(1,1,:)
+         ! !  print *, 'Surface horizontal advected salinity**2', activeTracerHorizontalAdvectionTendency(2,1,:)
+
+         !  squareAdvectedHorzTracer(2,:,:) = activeTracerHorizontalAdvectionTendency(2,:,:)*activeTracerHorizontalAdvectionTendency(2,:,:)
+         !  squareAdvectedVertTracer(2,:,:) = activeTracerVerticalAdvectionTendency(2,:,:)*activeTracerVerticalAdvectionTendency(2,:,:)
+
+         ! !  call mpas_timer_start("tracer adv")
+
+         !  ! Square active tracers, then passive them through advection scheme. 
+         !  ! call specific advection routine based on choice of monotonicity
+         !  allocate(activeTracersSquared(size(activeTracers,1), size(activeTracers,2), size(activeTracers,3)))
+
+         !  activeTracersSquared(1,:,:) = activeTracers(1,:,:) * activeTracers(1,:,:)
+         !  activeTracersSquared(2,:,:) = activeTracers(2,:,:) * activeTracers(2,:,:)
+
+         !  ! call specific advection routine based on choice of monotonicity, this updates activeTracerTendency components
+         !  call ocn_tracer_advection_tend(activeTracersSquared, &
+         !                                 normalThicknessFlux, vertAleTransportTop, &
+         !                                 layerThickness, dt, tracerGroupTend, &
+         !                                 computeBudgets)
+         ! !  if (config_flux_limiter == 'monotonic') then
+         ! !      call ocn_tracer_advection_mono_tend(tend, activeTracersSquared, layerThickness,    &
+         ! !                                          normalThicknessFlux, w, dt, &
+         ! !                                          computeBudgets)
+         ! !  else
+         ! !      call ocn_tracer_advection_std_tend(activeTracersSquared, normalThicknessFlux, &
+         ! !                                         w, layerThickness, dt, tend)
+         ! !  endif
+
+         !  print *, 'Surface temperature**2 advected', activeTracerHorizontalAdvectionTendency(1,1,:) 
+         !  print *, 'Surface salinity**2 advected', activeTracerHorizontalAdvectionTendency(2,1,:) 
+      
+         !  !  call mpas_timer_stop("tracer adv")
+         !  ! Compute numerical mixing
+         !  chiSpurHorzTracerBR08(1,:,:) = ( activeTracerHorizontalAdvectionTendency(1,:,:) - squareAdvectedHorizontalTracer(1,:,:) ) / dt
+         !  chiSpurVertTracerBR08(1,:,:) = ( activeTracerVerticalAdvectionTendency(1,:,:) - squareAdvectedVerticalTracer(1,:,:) ) / dt
+
+         !  chiSpurHorzTracerBR08(2,:,:) = ( activeTracerHorizontalAdvectionTendency(2,:,:) - squareAdvectedHorizontalTracer(2,:,:) ) / dt
+         !  chiSpurVertTracerBR08(2,:,:) = ( activeTracerVerticalAdvectionTendency(2,:,:) - squareAdvectedVerticalTracer(2,:,:) ) / dt
+         ! !  end if
           block => block%next
        end do
        deallocate(vertDiffMid)
+       deallocate(tmp2D)
+       deallocate(sal2D)
+       deallocate(squareAdvectedHorzTracer)
+       deallocate(squareAdvectedVertTracer)
+       deallocate(activeTracersSquared)
  
     end subroutine ocn_compute_discrete_variance_decay!}}}
 
