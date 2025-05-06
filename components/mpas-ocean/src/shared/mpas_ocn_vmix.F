@@ -1590,45 +1590,46 @@ contains
 #ifdef MPAS_OPENACC
                !$acc enter data copyin(tracerGroupSurfaceFlux)
 #endif
-
-               if (trim(groupItr % memberName) /= 'activeTracers' .and. &
-                   config_cvmix_background_diffusion_passive_enable) then
+               ! Skip implicit vertical mixing for numerical mixing tracers 
+               if (trim(groupItr % memberName) /= 'numericalMixingTracers') then
+                  if (trim(groupItr % memberName) /= 'activeTracers' .and. &
+                      config_cvmix_background_diffusion_passive_enable) then
 
 
 #ifdef MPAS_OPENACC
-                  !$acc parallel loop present(vertDiffPassiveTopOfCell, vertDiffTopOfCell)
+                     !$acc parallel loop present(vertDiffPassiveTopOfCell, vertDiffTopOfCell)
 #else
-                  !$omp parallel
-                  !$omp do schedule(runtime) private(k, iTracer)
+                     !$omp parallel
+                     !$omp do schedule(runtime) private(k, iTracer)
 #endif
-                  do iCell = 1, nCellsOwned
-                  do k = 2, maxLevelCell(iCell)
-                      vertDiffPassiveTopOfCell(k,iCell) = vertDiffTopOfCell(k,iCell) - &
-                         config_cvmix_background_diffusion + config_cvmix_background_diffusion_passive
-                  end do
-                  end do
+                     do iCell = 1, nCellsOwned
+                     do k = 2, maxLevelCell(iCell)
+                        vertDiffPassiveTopOfCell(k,iCell) = vertDiffTopOfCell(k,iCell) - &
+                           config_cvmix_background_diffusion + config_cvmix_background_diffusion_passive
+                     end do
+                     end do
 #ifndef MPAS_OPENACC
-                  !$omp end do
-                  !$omp end parallel
+                     !$omp end do
+                     !$omp end parallel
 #endif
-
-
-
-
-
 
 #ifdef MPAS_OPENACC
-                      !$acc update host (vertDiffPassiveTopOfCell)
+                     !$acc update host (vertDiffPassiveTopOfCell)
 #endif
 
-                      call ocn_tracer_vmix_tend_implicit(dt, vertDiffPassiveTopOfCell, layerThickness, tracersGroup, &
-                        vertNonLocalFlux, tracerGroupSurfaceFlux,  &
-                        config_cvmix_kpp_nonlocal_with_implicit_mix, err)
+                     call ocn_tracer_vmix_tend_implicit(dt, vertDiffPassiveTopOfCell, layerThickness, tracersGroup, &
+                          vertNonLocalFlux, tracerGroupSurfaceFlux,  &
+                          config_cvmix_kpp_nonlocal_with_implicit_mix, err)
+                  else
+                     call ocn_tracer_vmix_tend_implicit(dt, vertDiffTopOfCell, layerThickness, tracersGroup, &
+                          vertNonLocalFlux, tracerGroupSurfaceFlux,  &
+                          config_cvmix_kpp_nonlocal_with_implicit_mix, err)
+                  end if
+
                else
-                      call ocn_tracer_vmix_tend_implicit(dt, vertDiffTopOfCell, layerThickness, tracersGroup, &
-                        vertNonLocalFlux, tracerGroupSurfaceFlux,  &
-                        config_cvmix_kpp_nonlocal_with_implicit_mix, err)
+                  print *, 'Skipping vmix implicit call for tracerGroup = ', groupItr % memberName
                end if
+
 #ifdef MPAS_OPENACC
                !$acc exit data delete(tracerGroupSurfaceFlux)
 #endif

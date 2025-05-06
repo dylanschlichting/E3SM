@@ -143,7 +143,7 @@ contains
       !-----------------------------------------------------------------
 
       if(.not.tracerHmixOn) return
-
+      
       call mpas_timer_start("tracer hmix")
 
       call ocn_tracer_hmix_del2_tend(meshPool, layerThickEdgeMean, tracers, tend, err1)
