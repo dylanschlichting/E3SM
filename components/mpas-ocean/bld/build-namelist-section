@@ -680,6 +680,18 @@ add_default($nl, 'config_use_CFCTracers_ttd_forcing');
 add_default($nl, 'config_use_CFC11');
 add_default($nl, 'config_use_CFC12');
 
+#########################################################
+# Namelist group: tracer_forcing_numericalMixingTracers #
+#########################################################
+
+add_default($nl, 'config_use_numericalMixingTracers');
+add_default($nl, 'config_use_numericalMixingTracers_surface_bulk_forcing');
+add_default($nl, 'config_use_numericalMixingTracers_surface_restoring');
+add_default($nl, 'config_use_numericalMixingTracers_interior_restoring');
+add_default($nl, 'config_use_numericalMixingTracers_exponential_decay');
+add_default($nl, 'config_use_numericalMixingTracers_idealAge_forcing');
+add_default($nl, 'config_use_numericalMixingTracers_ttd_forcing');
+
 ##################################
 # Namelist group: AM_globalStats #
 ##################################

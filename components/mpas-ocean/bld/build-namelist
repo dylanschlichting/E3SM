@@ -1186,6 +1186,8 @@ if ($ice_bgc eq 'ice_bgc' ) {
 }
 add_default($nl, 'config_use_ecosysTracers_river_inputs_from_coupler');
 
+
+
 ####################################################
 # Namelist group: tracer_forcing_freshwaterTracers #
 ####################################################
@@ -1285,6 +1287,19 @@ add_default($nl, 'config_use_CFCTracers_idealAge_forcing');
 add_default($nl, 'config_use_CFCTracers_ttd_forcing');
 add_default($nl, 'config_use_CFC11');
 add_default($nl, 'config_use_CFC12');
+
+#########################################################
+# Namelist group: tracer_forcing_numericalMixingTracers #
+#########################################################
+
+add_default($nl, 'config_use_numericalMixingTracers');
+add_default($nl, 'config_use_numericalMixingTracers_surface_bulk_forcing');
+add_default($nl, 'config_use_numericalMixingTracers_surface_restoring');
+add_default($nl, 'config_use_numericalMixingTracers_interior_restoring');
+add_default($nl, 'config_use_numericalMixingTracers_exponential_decay');
+add_default($nl, 'config_use_numericalMixingTracers_idealAge_forcing');
+add_default($nl, 'config_use_numericalMixingTracers_ttd_forcing');
+
 
 ##################################
 # Namelist group: AM_globalStats #
@@ -1895,6 +1910,7 @@ my @groups = qw(run_modes
                 tracer_forcing_macromoleculestracers
                 tracer_forcing_idealagetracers
                 tracer_forcing_cfctracers
+                tracer_forcing_numericalmixingtracers
                 am_globalstats
                 am_surfaceareaweightedaverages
                 am_watermasscensus
