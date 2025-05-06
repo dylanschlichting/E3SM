@@ -48,6 +48,12 @@
 			<var name="passiveSalinity" array_group="numericalMixingGRP" units="1.e-3"
 			description="salinity only passed through advection predictor"
 			/>
+			<var name="passiveTemperatureSquared" array_group="numericalMixingGRP" units="C^2"
+			description="potential temperature only passed through advection predictor"
+			/>
+			<var name="passiveSalinitySquared" array_group="numericalMixingGRP" units="{1.e-3}^2"
+			description="salinity squared only passed through advection predictor"
+			/>
 		</var_array>
 	</var_struct>
 </var_struct>
@@ -60,6 +66,12 @@
 			/>
 			<var name="passiveSalinityTend" array_group="numericalMixingGRP" units="m 1.e-3 s^-1"
 			description="time tendency of passive salinity measured as change in practical salinity units times layerThickness per second"
+			/>
+			<var name="passiveTemperatureSquaredTend" array_group="numericalMixingGRP" units="C m s^-1"
+			description="time tendency of passive potential temperature squared measured as change in degrees times layerThickness per second"
+			/>
+			<var name="passiveSalinitySquaredTend" array_group="numericalMixingGRP" units="m {1.e-3}^2 s^-1"
+			description="time tendency of passive salinity squared measured as change in practical salinity units times layerThickness per second"
 			/>
 		</var_array>
 	</var_struct>
@@ -74,6 +86,12 @@
 			<var name="passiveSalinitySurfaceFlux" array_group="numericalMixingSurfaceFluxGRP" units="1.e-3 m s^-1"
 			description="Flux of salinity through the ocean surface. Positive into ocean."
 			/>
+			<var name="passiveTemperatureSquaredSurfaceFlux" array_group="numericalMixingSurfaceFluxGRP" units="C^2 m s^-1"
+			description="Flux of temperature squared through the ocean surface. Positive into ocean."
+			/>
+			<var name="passiveSalinitySquaredSurfaceFlux" array_group="numericalMixingSurfaceFluxGRP" units="{1.e-3}^2 m s^-1"
+			description="Flux of salinity squared through the ocean surface. Positive into ocean."
+			/>
 		</var_array>
 
 		<var_array name="numericalMixingTracersSurfaceFluxRunoff" type="real" dimensions="nCells Time" packages="numericalMixingTracersPKG">
@@ -82,6 +100,12 @@
 			/>
 			<var name="passiveSalinitySurfaceFluxRunoff" array_group="numericalMixingSurfaceFluxesRunoffGRP" units="1.e-3 m s^-1"
 			description="Flux of salinity through the ocean surface due to river runoff. Positive into ocean."
+			/>
+			<var name="passiveTemperatureßSquaredeSurfaceFluxRunoff" array_group="numericalMixingSurfaceFluxesRunoffGRP" units="C^2 m s^-1"
+			description="Flux of temperature squared through the ocean surface due to river runoff. Positive into ocean."
+			/>
+			<var name="passiveSalinitySquaredSurfaceFluxRunoff" array_group="numericalMixingSurfaceFluxesRunoffGRP" units="{1.e-3}^2 m s^-1"
+			description="Flux of salinity squared through the ocean surface due to river runoff. Positive into ocean."
 			/>
 		</var_array>
 
@@ -92,6 +116,12 @@
 			<var name="passiveSalinitySurfaceFluxSubglacialRunoff" array_group="numericalMixingSurfaceFluxSubglacialRunoffGRP" units="1.e-3 m s^-1"
 			description="Flux of salinity through the ocean surface due to subglacial runoff. Positive into ocean."
 			/>
+			<var name="passiveTemperatureSquaredSurfaceFluxSubglacialRunoff" array_group="numericalMixingSurfaceFluxSubglacialRunoffGRP" units="C^2 m s^-1"
+			description="Flux of temperature squared through the ocean surface due to subglacial runoff. Positive into ocean."
+			/>
+			<var name="passiveSalinitySquaredSurfaceFluxSubglacialRunoff" array_group="numericalMixingSurfaceFluxSubglacialRunoffGRP" units="{1.e-3}^2 m s^-1"
+			description="Flux of salinity squared through the ocean surface due to subglacial runoff. Positive into ocean."
+			/>
 		</var_array>
 
 		<var_array name="numericalMixingTracersSurfaceFluxRemoved" type="real" dimensions="nCells Time" packages="numericalMixingTracersPKG">
@@ -101,8 +131,12 @@
 			<var name="passiveSalinitySurfaceFluxRemoved" array_group="numericalMixingSurfaceFluxRemovedGRP" units="1.e-3 m s^-1"
 			description="Flux of salinity that is ignored coming into the ocean. Positive into ocean."
 			/>
+			<var name="passiveTemperatureSquaredSurfaceFluxRemoved" array_group="numericalMixingSurfaceFluxRemovedGRP" units="C^2 m s^-1"
+			description="Flux of temperature squared that is ignored coming into the ocean. Positive into ocean."
+			/>
+			<var name="passiveSalinitySquaredSurfaceFluxRemoved" array_group="numericalMixingSurfaceFluxRemovedGRP" units="{1.e-3}^2 m s^-1"
+			description="Flux of salinity squared that is ignored coming into the ocean. Positive into ocean."
+			/>
 		</var_array>
 	</var_struct>
 </var_struct>
-
-
