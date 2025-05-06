@@ -822,6 +822,20 @@ contains
            if (config_use_tracerGroup_ttd_forcing) &
              call mpas_log_write('TTD forcing not supported for freshwaterTracers group', MPAS_LOG_CRIT)
          endif
+         if ( groupName == 'numericalMixingTracers' ) then
+           if (config_use_tracerGroup_surface_restoring) &
+             call mpas_log_write('surface restoring not supported for numericalMixingTracers group', MPAS_LOG_CRIT)
+           if (config_use_tracerGroup_interior_restoring) &
+             call mpas_log_write('interior restoring not supported for numericalMixingTracers group', MPAS_LOG_CRIT)
+           if (config_use_tracerGroup_exponential_decay) &
+             call mpas_log_write('exponential decay not supported for numericalMixingTracers group', MPAS_LOG_CRIT)
+           if (config_use_tracerGroup_idealAge_forcing) &
+             ! TODO support this
+             call mpas_log_write('idealAge forcing not supported for numericalMixingTracers group', MPAS_LOG_CRIT)
+           if (config_use_tracerGroup_ttd_forcing) &
+             call mpas_log_write('TTD forcing not supported for numericalMixingTracers group', MPAS_LOG_CRIT)
+         endif
+
          ! Get tracers from pool, determine number of tracers in group
          call mpas_pool_get_array(tracersPool, groupName, &
                                   tracerGroup, timeLevel)
@@ -1244,15 +1258,21 @@ contains
             !$omp end do
             !$omp end parallel
          endif ! compute budgets
-
-         call ocn_tracer_hmix_tend(meshPool, layerThickEdgeMean, &
-                                   layerThickness, zMid, tracerGroup, &
-                                   RediKappa, slopeTriadUp, &
-                                   slopeTriadDown, limiterUp, &
-                                   limiterDown, dt, isActiveTracer, &
-                                   rediLimiterCount, &
-                                   tracerGroupTend, err)
-
+    
+         ! Skip calculation of horizontal mixing tendency if numerical mixing tracers
+         if (trim(groupItr % memberName) /= 'numericalMixingTracers') then
+            call ocn_tracer_hmix_tend(meshPool, layerThickEdgeMean, &
+                                    layerThickness, zMid, tracerGroup, &
+                                    RediKappa, slopeTriadUp, &
+                                    slopeTriadDown, limiterUp, &
+                                    limiterDown, dt, isActiveTracer, &
+                                    rediLimiterCount, &
+                                    tracerGroupTend, err)
+            print *, 'Calculating ocn_tracer_hmix_tend for tracerGroup =', groupItr % memberName                         
+         else
+            print *, 'Skipping ocn_tracer_hmix_tend for tracerGroup = ', groupItr % memberName    
+         end if
+         
          if (computeBudgets) then
             ! Finish budget calculation by subtracting before, after
             !$omp parallel
@@ -1351,60 +1371,73 @@ contains
 
          !
          ! Compute tracer tendency due to non-local flux computed in KPP
-         !
-         if (config_use_cvmix_kpp) then
+         ! Skip numerical mixing tracers 
+         if (trim(groupItr % memberName) /= 'numericalMixingTracers') then
+
+            if (config_use_cvmix_kpp) then
                call mpas_timer_start("non-local flux from KPP")
-            if (.not. config_cvmix_kpp_nonlocal_with_implicit_mix) then
-               if (computeBudgets) then
-                  !$omp parallel
-                  !$omp do schedule(runtime) private(k,n)
-                  do iCell = 1, nCellsAll
-                  do k = 1, nVertLevels
-                  do n = 1, nTracersGroup
-                     activeTracerNonLocalTendency(n,k,iCell) = &
-                                  tracerGroupTend(n,k,iCell)
-                  end do
-                  end do
-                  end do
-                  !$omp end do
-                  !$omp end parallel
-               endif ! compute budgets
 
-               if (isActiveTracer) then
-                  call ocn_tracer_nonlocalflux_tend(meshPool, &
-                                          vertNonLocalFlux, &
-                                          nonLocalSurfaceTracerFlux, &
-                                          tracerGroupTend, err)
-               else ! not active
-                  call ocn_tracer_nonlocalflux_tend(meshPool, &
-                                          vertNonLocalFlux, &
-                                          tracerGroupSurfaceFlux, &
-                                          tracerGroupTend, err)
-               endif ! active tracer
+               if (.not. config_cvmix_kpp_nonlocal_with_implicit_mix) then
+                  if (computeBudgets) then
+                     !$omp parallel
+                     !$omp do schedule(runtime) private(k,n)
+                     do iCell = 1, nCellsAll
+                     do k = 1, nVertLevels
+                     do n = 1, nTracersGroup
+                        activeTracerNonLocalTendency(n,k,iCell) = &
+                           tracerGroupTend(n,k,iCell)
+                     end do
+                     end do
+                     end do
+                     !$omp end do
+                     !$omp end parallel
+                  endif ! compute budgets
 
-               if (computeBudgets) then
-                  !$omp parallel
-                  !$omp do schedule(runtime)
-                  do iCell = 1, nCellsAll
-                  do k = 1, nVertLevels
-                  do n = 1, nTracersGroup
-                     activeTracerNonLocalTendency(n,k,iCell) = &
-                                  tracerGroupTend(n,k,iCell) - &
-                     activeTracerNonLocalTendency(n,k,iCell)
-                  end do
-                  end do
-                  end do
-                  !$omp end do
-                  !$omp end parallel
-               endif ! compute budgets
-            end if ! not non-local with implicit mix
-            call mpas_timer_stop("non-local flux from KPP")
-         end if ! KPP
+                  if (isActiveTracer) then
+                     call ocn_tracer_nonlocalflux_tend(meshPool, &
+                                             vertNonLocalFlux, &
+                                             nonLocalSurfaceTracerFlux, &
+                                             tracerGroupTend, err)
+                  else ! not active
+                     call ocn_tracer_nonlocalflux_tend(meshPool, &
+                                             vertNonLocalFlux, &
+                                             tracerGroupSurfaceFlux, &
+                                             tracerGroupTend, err)
+                  endif ! active tracer
+
+                  if (computeBudgets) then
+                     !$omp parallel
+                     !$omp do schedule(runtime)
+                     do iCell = 1, nCellsAll
+                     do k = 1, nVertLevels
+                     do n = 1, nTracersGroup
+                        activeTracerNonLocalTendency(n,k,iCell) = &
+                           tracerGroupTend(n,k,iCell) - &
+                           activeTracerNonLocalTendency(n,k,iCell)
+                     end do
+                     end do
+                     end do
+                     !$omp end do
+                     !$omp end parallel
+                  endif ! compute budgets
+               endif ! not non-local with implicit mix
+
+               call mpas_timer_stop("non-local flux from KPP")
+            endif ! KPP
+
+         else
+            print *, 'Skipping ocn_tracer_vmix_tend_nonlocal for tracerGroup = ', groupItr % memberName   
+         endif
 
          ! Compute tracer tendency due to production/destruction of
-         ! frazil ice
-         call ocn_frazil_forcing_tracers(meshPool, tracersPool, &
-                     groupName, forcingPool, tracerGroupTend, err)
+         ! frazil ice. Skip numerical mixing tracers
+         if (trim(groupItr % memberName) /= 'numericalMixingTracers') then
+            call ocn_frazil_forcing_tracers(meshPool, tracersPool, &
+                                            groupName, forcingPool, tracerGroupTend, err)
+         else
+            print *, 'Skipping ocn_frazil_forcing_tracers for tracerGroup = ', groupItr % memberName
+         endif
+
 
 
       end if ! config use flag on
