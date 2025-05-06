@@ -1,0 +1,108 @@
+<nml_record name="tracer_forcing_numericalMixingTracers">
+	<nml_option name="config_use_numericalMixingTracers" type="logical" default_value=".false." units="unitless"
+		description="if true, the 'numericalMixingTracers' category is enabled for the run"
+		possible_values=".true. or .false."
+	/>
+	<nml_option name="config_use_numericalMixingTracers_surface_bulk_forcing" type="logical" default_value=".false." units="unitless"
+		description="if true, surface bulk forcing from coupler is added to surfaceTracerFlux in 'numericalMixingTracers' category"
+		possible_values=".true. or .false."
+	/> 
+	<nml_option name="config_use_numericalMixingTracers_surface_restoring" type="logical" default_value=".false." units="unitless"
+		description="if true, surface restoring source is applied to tracers in 'numericalMixingTracers' category"
+		possible_values=".true. or .false."
+	/>
+	<nml_option name="config_use_numericalMixingTracers_interior_restoring" type="logical" default_value=".false." units="unitless"
+		description="if true, interior restoring source is applied to tracers in 'numericalMixingTracers' category"
+		possible_values=".true. or .false."
+	/>
+	<nml_option name="config_use_numericalMixingTracers_exponential_decay" type="logical" default_value=".false." units="unitless"
+		description="if true, exponential decay source is applied to tracers in 'numericalMixingTracers' category"
+		possible_values=".true. or .false."
+	/>
+	<nml_option name="config_use_numericalMixingTracers_idealAge_forcing" type="logical" default_value=".false." units="unitless"
+		description="if true, idealAge forcing source is applied to tracers in 'numericalMixingTracers' category"
+		possible_values=".true. or .false."
+	/>
+	<nml_option name="config_use_numericalMixingTracers_ttd_forcing" type="logical" default_value=".false." units="unitless"
+		description="if true, transit time distribution forcing source is applied to tracers in 'numericalMixingTracers' category"
+		possible_values=".true. or .false."
+	/>
+</nml_record>
+
+<packages>
+	<package name="numericalMixingTracersPKG" description="This package includes variables required to include numerical mixing tracers."/>
+	<package name="numericalMixingTracersBulkRestoringPKG" description="This package includes variables required to compute bulk restoring on the numerical mixing tracer group."/>
+	<package name="numericalMixingTracersSurfaceRestoringPKG" description="This package includes variables required to compute surface restoring on the numerical mixing tracer group."/>
+	<package name="numericalMixingTracersInteriorRestoringPKG" description="This package includes variables required to compute interior restoring on the numerical mixing tracer group."/>
+	<package name="numericalMixingTracersExponentialDecayPKG" description="This package includes variables required to compute exponential decay on the numerical mixing tracer group."/>
+	<package name="numericalMixingTracersIdealAgePKG" description="This package includes variables required to compute ideal age forcing on the numerical mixing tracer group."/>
+	<package name="numericalMixingTracersTTDPKG" description="This package includes variables required to compute transit-time distribution forcing on the numerical mixing tracer group."/>
+</packages>
+
+<var_struct name="state" time_levs="2">
+	<var_struct name="tracers" time_levs="2">
+		<var_array name="numericalMixingTracers" dimensions="nVertLevels nCells Time" type="real" packages="numericalMixingTracersPKG" missing_value="FILLVAL" missing_value_mask="cellMask">
+			<var name="passiveTemperature" array_group="numericalMixingGRP" units="C"
+			description="potential temperature only passed through advection predictor"
+			/>
+			<var name="passiveSalinity" array_group="numericalMixingGRP" units="1.e-3"
+			description="salinity only passed through advection predictor"
+			/>
+		</var_array>
+	</var_struct>
+</var_struct>
+
+<var_struct name="tend" time_levs="1">
+	<var_struct name="tracersTend" time_levs="1">
+		<var_array name="numericalMixingTracersTend" type="real" dimensions="nVertLevels nCells Time" packages="numericalMixingTracersPKG" missing_value="FILLVAL" missing_value_mask="cellMask">
+			<var name="passiveTemperatureTend" array_group="numericalMixingGRP" units="C m s^-1"
+			description="time tendency of passive potential temperature measured as change in degrees times layerThickness per second"
+			/>
+			<var name="passiveSalinityTend" array_group="numericalMixingGRP" units="m 1.e-3 s^-1"
+			description="time tendency of passive salinity measured as change in practical salinity units times layerThickness per second"
+			/>
+		</var_array>
+	</var_struct>
+</var_struct>
+
+<var_struct name="forcing" time_levs="1">
+	<var_struct name="tracersSurfaceFlux" time_levs="1">
+		<var_array name="numericalMixingTracersSurfaceFlux" type="real" dimensions="nCells Time" packages="numericalMixingTracersPKG">
+			<var name="passiveTemperatureSurfaceFlux" array_group="numericalMixingSurfaceFluxGRP" units="C m s^-1"
+			description="Flux of temperature through the ocean surface. Positive into ocean."
+			/>
+			<var name="passiveSalinitySurfaceFlux" array_group="numericalMixingSurfaceFluxGRP" units="1.e-3 m s^-1"
+			description="Flux of salinity through the ocean surface. Positive into ocean."
+			/>
+		</var_array>
+
+		<var_array name="numericalMixingTracersSurfaceFluxRunoff" type="real" dimensions="nCells Time" packages="numericalMixingTracersPKG">
+			<var name="passiveTemperatureSurfaceFluxRunoff" array_group="numericalMixingSurfaceFluxesRunoffGRP" units="C m s^-1"
+			description="Flux of temperature through the ocean surface due to river runoff. Positive into ocean."
+			/>
+			<var name="passiveSalinitySurfaceFluxRunoff" array_group="numericalMixingSurfaceFluxesRunoffGRP" units="1.e-3 m s^-1"
+			description="Flux of salinity through the ocean surface due to river runoff. Positive into ocean."
+			/>
+		</var_array>
+
+		<var_array name="numericalMixingTracersSurfaceFluxSubglacialRunoff" type="real" dimensions="nCells Time" packages="numericalMixingTracersPKG">
+			<var name="passiveTemperatureSurfaceFluxSubglacialRunoff" array_group="numericalMixingSurfaceFluxSubglacialRunoffGRP" units="C m s^-1"
+			description="Flux of temperature through the ocean surface due to subglacial runoff. Positive into ocean."
+			/>
+			<var name="passiveSalinitySurfaceFluxSubglacialRunoff" array_group="numericalMixingSurfaceFluxSubglacialRunoffGRP" units="1.e-3 m s^-1"
+			description="Flux of salinity through the ocean surface due to subglacial runoff. Positive into ocean."
+			/>
+		</var_array>
+
+		<var_array name="numericalMixingTracersSurfaceFluxRemoved" type="real" dimensions="nCells Time" packages="numericalMixingTracersPKG">
+			<var name="passiveTemperatureSurfaceFluxRemoved" array_group="numericalMixingSurfaceFluxRemovedGRP" units="C m s^-1"
+			description="Flux of temperature that is ignored coming into the ocean. Positive into ocean."
+			/>
+			<var name="passiveSalinitySurfaceFluxRemoved" array_group="numericalMixingSurfaceFluxRemovedGRP" units="1.e-3 m s^-1"
+			description="Flux of salinity that is ignored coming into the ocean. Positive into ocean."
+			/>
+		</var_array>
+	</var_struct>
+</var_struct>
+
+
