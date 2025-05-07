@@ -247,7 +247,9 @@ module ocn_time_integration_split_ab2
 
       integer :: &
          startIndex, endIndex, &! start, end index for tracer groups
-         indexSalinity          ! tracer index for salinity
+         indexSalinity, &          ! tracer index for salinity
+         indexTemperature          ! tracer index for salinity
+
 
       integer :: iTracer, numTracers, numActiveTracers
 
@@ -272,6 +274,13 @@ module ocn_time_integration_split_ab2
       real (kind=RKIND), dimension(:,:,:), pointer :: &
          tracersGroupTend,      &! tendencies for tracer groups
          activeTracersTend       ! active tracer tendencies
+
+      real (kind=RKIND), dimension(:,:,:), pointer :: & 
+            numericalMixingTracers
+      
+      real (kind=RKIND), dimension(:,:,:), pointer :: &
+         numericalMixingTracersHorAdvTend,      &
+         numericalMixingTracersVertAdvTend  
 
       ! Forcing pool
       real (kind=RKIND), dimension(:), pointer :: tidalPotentialEta
@@ -387,6 +396,9 @@ module ocn_time_integration_split_ab2
       call mpas_pool_get_dimension_scalar(tracersPool, 'index_salinity', &
                                                         indexSalinity)
 
+      call mpas_pool_get_dimension_scalar(tracersPool, 'index_temperature', &
+                                                        indexTemperature)
+
       !*** Retrieve tendency variables
 
       call mpas_pool_get_array(tendPool, 'highFreqThickness', &
@@ -405,6 +417,12 @@ module ocn_time_integration_split_ab2
                                           lowFreqDivergenceTend)
 
       call mpas_pool_get_array(tracersPool, 'activeTracers', activeTracersNew, 2)
+      
+      ! Set the numerical mixing tracers = to the active tracers. Order is temp, salt, temp**2,salt**2
+      ! numericalMixingTracers(1,:,:) = activeTracersNew(indexTemperature,:,:)
+      ! numericalMixingTracers(2,:,:) = activeTracersNew(indexSalinity,:,:)
+      ! numericalMixingTracers(3,:,:) = activeTracersNew(indexTemperature,:,:)**2
+      ! numericalMixingTracers(4,:,:) = activeTracersNew(indexSalinity,:,:)**2
 
       allocate(bottomDepthEdge(nEdgesAll+1))
 
@@ -2333,6 +2351,20 @@ module ocn_time_integration_split_ab2
             !$acc update host(tracersSurfaceValue)
 #endif
 
+            if ( config_use_numericalMixingTracers ) then
+               !$omp parallel
+               !$omp do schedule(runtime) private(k)
+               do iCell = 1, nCells
+                  do k= 1, maxLevelCell(iCell)
+                     numericalMixingTracersHorAdvTend(:,k,iCell) = numericalMixingTracersHorAdvTend(:,k,iCell) / layerThicknessNew(k,iCell)
+                     numericalMixingTracersVertAdvTend(:,k,iCell)  = numericalMixingTracersVertAdvTend(:,k,iCell) / layerThicknessNew(k,iCell)
+                     ! IRFTracersNonLocalTend(:,k,iCell) = IRFTracersNonLocalTend(:,k,iCell) / layerThicknessNew(k,iCell)
+                  end do
+               end do
+               !$omp end do
+               !$omp end parallel
+            endif
+
             call mpas_pool_begin_iteration(tracersPool)
             do while (mpas_pool_get_next_member(tracersPool, &
                                                 groupItr) )
@@ -2647,6 +2679,7 @@ module ocn_time_integration_split_ab2
          !$acc enter data copyin(landIceDraft)
       endif
 #endif
+
       call ocn_diagnostic_solve(dt, statePool, forcingPool, meshPool, verticalMeshPool, &
                                 scratchPool, tracersPool, 2)
 
@@ -2830,6 +2863,29 @@ module ocn_time_integration_split_ab2
          !$omp end parallel
 #endif
       end if
+
+      ! Reset numericalMixingTracers to the activeTracer values? 
+      ! if ( config_use_numericalMixingTracers ) then
+      !    call mpas_pool_begin_iteration(tracersPool)
+      !    do while ( mpas_pool_get_next_member(tracersPool, groupItr) )
+      !       if ( groupItr % memberType == MPAS_POOL_FIELD ) then
+      !             ! Reset numericalMixingTracers to original value
+      !             if ( trim(groupItr % memberName) == 'numericalMixingTracers' ) then
+      !             call mpas_pool_get_array(tracersPool, groupItr % memberName, tracersGroupCur, 1)
+      !             call mpas_pool_get_array(tracersPool, groupItr % memberName, tracersGroupNew, 2)
+      !                !$omp parallel
+      !                !$omp do schedule(runtime) private(k)
+      !                do iCell = 1, nCells
+      !                   do k = 1, maxLevelCell(iCell)
+      !                      tracersGroupNew(:,k,iCell) = tracersGroupCur(:,k,iCell)
+      !                   end do
+      !                end do
+      !                !$omp end do
+      !                !$omp end parallel
+      !             end if
+      !       end if
+      !    end do
+      ! end if
 
       call ocn_diagnostic_solve(dt, statePool, forcingPool, meshPool, verticalMeshPool, &
                                 scratchPool, tracersPool, 2)

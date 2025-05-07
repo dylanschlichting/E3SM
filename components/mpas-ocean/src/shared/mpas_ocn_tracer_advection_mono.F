@@ -66,7 +66,8 @@ module ocn_tracer_advection_mono
    subroutine ocn_tracer_advection_mono_tend( &
                                         tend, tracers, layerThickness, &
                                         normalThicknessFlux, w, dt,    &
-                                        computeBudgets, skipTracer)!{{{
+                                        computeBudgets, skipTracer,    & 
+                                        computeNumericalMixingTracers)!{{{
 
       !-----------------------------------------------------------------
       ! Input/Output parameters
@@ -91,7 +92,8 @@ module ocn_tracer_advection_mono
          dt                    !< [in] Timestep
 
       logical, intent(in) :: &
-         computeBudgets        !< [in] Flag to compute active tracer budgets
+         computeBudgets, &        !< [in] Flag to compute active tracer budgets
+         computeNumericalMixingTracers
 
       logical, dimension(:), intent(in) :: &
          skipTracer            !< [in] Flag to skip tracer in tracers
@@ -132,6 +134,11 @@ module ocn_tracer_advection_mono
          workTend,      &! temp for holding some tendency values
          lowOrderFlx,   &! low order flux for FCT
          highOrderFlx    ! high order flux for FCT
+
+      ! pointers for tendencies used in diagnostic budget computation
+      real (kind=RKIND), dimension(:,:,:), pointer, contiguous :: &
+         numericalMixingTracersHorAdvTend,    &
+         numericalMixingTracersVerAdvTend
 
       real (kind=RKIND), parameter :: &
          eps = 1.e-10_RKIND  ! small number to avoid numerical difficulties
@@ -555,6 +562,18 @@ module ocn_tracer_advection_mono
         !$omp end do
         !$omp end parallel
 #endif
+        
+        if (computeNumericalMixingTracers) then
+           !$omp parallel
+           !$omp do schedule(runtime) private(k)
+           do iCell = 1, nCells
+             do k = 1, maxLevelCell(iCell)
+                 numericalMixingTracersHorAdvTend(iTracer,k,iCell) = workTend(k,iCell)
+             end do
+           end do ! iCell loop
+           !$omp end do
+           !$omp end parallel
+        end if
 
 #ifdef _ADV_TIMERS
         call mpas_timer_stop('flux accumulate')
@@ -593,10 +612,10 @@ module ocn_tracer_advection_mono
            !$omp do schedule(runtime) private(k)
 #endif
            do iCell = 1, nCellsOwned
-           do k = minLevelCell(iCell), maxLevelCell(iCell)
-              activeTracerHorizontalAdvectionTendency(iTracer,k,iCell) = &
+                do k = minLevelCell(iCell), maxLevelCell(iCell)
+                        activeTracerHorizontalAdvectionTendency(iTracer,k,iCell) = &
                                                      workTend(k,iCell)
-           end do
+                end do
            end do ! iCell loop
 #ifndef MPAS_OPENACC
            !$omp end do
@@ -874,6 +893,16 @@ module ocn_tracer_advection_mono
         !$omp end do
         !$omp end parallel
 #endif
+
+        if (computeNumericalMixingTracers) then
+           !$omp parallel
+           !$omp do schedule(runtime) private(k)
+           do iCell = 1, nCells
+             do k = 1, maxLevelCell(iCell)
+                 numericalMixingTracersVerAdvTend(iTracer,k,iCell) = workTend(k,iCell)
+             end do
+           end do ! iCell loop
+        end if
 
         ! Compute advection diagnostics and monotonicity checks if requested
 #ifdef _ADV_TIMERS

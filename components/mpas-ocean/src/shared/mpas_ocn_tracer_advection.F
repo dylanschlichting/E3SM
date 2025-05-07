@@ -65,7 +65,8 @@ module ocn_tracer_advection
 
    subroutine ocn_tracer_advection_tend(tracers, normalThicknessFlux, &
                                         w, layerThickness, dt, tend,  &
-                                        computeBudgets, skipTracer)!{{{
+                                        computeBudgets, skipTracer,   &
+                                        computeNumericalMixingTracers)!{{{
 
       !*** Input/Output parameters
 
@@ -88,6 +89,9 @@ module ocn_tracer_advection
       logical, intent(in) :: &
          computeBudgets      ! flag to compute active tracer budget
 
+      logical, intent(in) :: &
+         computeNumericalMixingTracers  ! flag to compute numericalMixingTracers
+
       logical, dimension(:), intent(in) :: &
          skipTracer          ! flag to skip tracer in tracers
 
@@ -104,7 +108,8 @@ module ocn_tracer_advection
       if (monotonicOn) then
          call ocn_tracer_advection_mono_tend(tend, tracers, layerThickness,    &
                                              normalThicknessFlux, w, dt,       &
-                                             computeBudgets, skipTracer)
+                                             computeBudgets, skipTracer,       &
+                                             computeNumericalMixingTracers)
 
       else
          call ocn_tracer_advection_std_tend(tracers, normalThicknessFlux, &
