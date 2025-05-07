@@ -140,3 +140,34 @@
 		</var_array>
 	</var_struct>
 </var_struct>
+
+<var_struct name="diagnostics" time_levs="1">
+	<var_array name="numericalMixingTracersHorAdvTend" type="real" dimensions="nVertLevels nCells Time" packages="numericalMixingTracersBudgetPKG">
+		<var name = "passiveTemperatureHorAdvTend" array_group="numericalMixingTracersHorAdvTend" units="C s^-1"
+		description="passive temperature tendency due to horizontal advection"
+		/>
+		<var name = "passiveSalinityHorAdvTend" array_group="numericalMixingTracersHorAdvTend" units="1.e-3 s^-1"
+		description="passive salinity tendency due to horizontal advection"
+		/>
+		<var name = "passiveTemperatureSquaredHorAdvTend" array_group="numericalMixingTracersHorAdvTend" units="{1.e-3}^2 s^-1"/
+		description="passive temperature squared tendency due to horizontal advection"
+		>
+		<var name = "passiveSalinitySquaredHorAdvTend" array_group="numericalMixingTracersHorAdvTend" units="C^2 s^-1"
+		description="passive salinity squared tendency due to horizontal advection"
+		/>
+	</var_array>
+	<var_array name="numericalMixingTracersVerAdvTend" type="real" dimensions="nVertLevels nCells Time" packages="numericalMixingTracersBudgetPKG">
+		<var name = "passiveTemperatureVerAdvTend" array_group="numericalMixingTracersVerAdvTend" units="C s^-1"
+		description="passive temperature tendency due to vertical advection"
+		/>
+		<var name = "passiveSalinityVerAdvTend" array_group="numericalMixingTracersVerAdvTend" units="1.e-3 s^-1"
+		description="passive salinity tendency due to vertical advection"
+		/>
+		<var name = "passiveTemperatureSquaredVerAdvTend" array_group="numericalMixingTracersVerAdvTend" units="{1.e-3}^2 s^-1"/
+		description="passive temperature squared tendency due to vertical advection"
+		>
+		<var name = "passiveSalinitySquaredVerAdvTend" array_group="numericalMixingTracersVerAdvTend" units="C^2 s^-1"
+		description="passive salinity squared tendency due to vertical advection"
+		/>
+	</var_array>
+</var_struct>
