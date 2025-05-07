@@ -592,7 +592,8 @@ contains
       logical :: &
          activeTracersOnly,  &! only compute tend for active tracers
          isActiveTracer,     &! is this group the active tracer group
-         computeBudgets       ! compute active tracer budgets
+         computeBudgets,     &! compute active tracer budgets
+         computeNumericalMixingTracers
 
       ! iterator and modified strings for tracer categories
       type (mpas_pool_iterator_type) :: groupItr
@@ -1221,10 +1222,13 @@ contains
          !     -div( layerThickness \phi u)
          ! Tracer budget is computed and stored within the tracer adv
          ! routine
+         computeNumericalMixingTracers = ( trim(groupItr % memberName) == 'numericalMixingTracers' )
+         print *, 'Numerical mixing tracers = ', computeNumericalMixingTracers
+
          call ocn_tracer_advection_tend(tracerGroup, &
                             normalThicknessFlux, vertAleTransportTop, &
                             layerThickness, dt, tracerGroupTend, &
-                            computeBudgets, skipTracer)
+                            computeBudgets, skipTracer, computeNumericalMixingTracers)
          deallocate(skipTracer)
 
          !$acc update host (activeTracerHorizontalAdvectionEdgeFlux, &
