@@ -292,8 +292,6 @@ module ocn_core_interface
 
 
       ! test for numericalMixingTracers buget
-
-
       call mpas_pool_get_package(packagePool, 'numericalMixingTracersBudgetPKGActive', numericalMixingTracersBudgetPKGActive)
       call mpas_pool_get_config(configPool, 'config_use_numericalMixingTracers', config_use_numericalMixingTracers)
       if ( config_use_numericalMixingTracers) then

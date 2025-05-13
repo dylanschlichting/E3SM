@@ -174,7 +174,7 @@ module ocn_diagnostics_variables
       activeTracerVerticalAdvectionTopFlux,    &
       activeTracerVertMixTendency,             &
       numericalMixingTracersHorAdvTend,        &
-      numericalMixingTracersVertAdvTend
+      numericalMixingTracersVerAdvTend
 
    real (kind=RKIND), pointer :: daysSinceStartOfSim
    real (kind=RKIND), pointer :: Time
