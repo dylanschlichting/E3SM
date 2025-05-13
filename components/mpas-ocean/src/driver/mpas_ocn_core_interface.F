@@ -119,6 +119,7 @@ module ocn_core_interface
       logical, pointer :: windStressBulkPKGActive
       logical, pointer :: variableBottomDragPKGActive
       logical, pointer :: tracerBudgetActive
+      logical, pointer :: numericalMixingTracersBudgetPKGActive
       logical, pointer :: landIcePressurePKGActive
       logical, pointer :: dataLandIceFluxesPKGActive
       logical, pointer :: landIceFluxesPKGActive
@@ -160,6 +161,7 @@ module ocn_core_interface
       logical, pointer :: config_use_tracerGroup_exponential_decay
       logical, pointer :: config_use_tracerGroup_idealAge_forcing
       logical, pointer :: config_use_tracerGroup_ttd_forcing
+      logical, pointer :: config_use_numericalMixingTracers
 
       logical, pointer :: config_use_freq_filtered_thickness
       logical, pointer :: config_use_frazil_ice_formation
@@ -286,6 +288,16 @@ module ocn_core_interface
       call mpas_pool_get_config(configPool, 'config_compute_active_tracer_budgets', config_compute_active_tracer_budgets)
       if ( config_compute_active_tracer_budgets ) then
          tracerBudgetActive = .true.
+      end if
+
+
+      ! test for numericalMixingTracers buget
+
+
+      call mpas_pool_get_package(packagePool, 'numericalMixingTracersBudgetPKGActive', numericalMixingTracersBudgetPKGActive)
+      call mpas_pool_get_config(configPool, 'config_use_numericalMixingTracers', config_use_numericalMixingTracers)
+      if ( config_use_numericalMixingTracers) then
+         numericalMixingTracersBudgetPKGActive = .true.
       end if
 
       !

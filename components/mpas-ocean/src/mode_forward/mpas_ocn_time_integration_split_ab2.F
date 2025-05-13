@@ -2358,7 +2358,6 @@ module ocn_time_integration_split_ab2
                   do k= 1, maxLevelCell(iCell)
                      numericalMixingTracersHorAdvTend(:,k,iCell) = numericalMixingTracersHorAdvTend(:,k,iCell) / layerThicknessNew(k,iCell)
                      numericalMixingTracersVertAdvTend(:,k,iCell)  = numericalMixingTracersVertAdvTend(:,k,iCell) / layerThicknessNew(k,iCell)
-                     ! IRFTracersNonLocalTend(:,k,iCell) = IRFTracersNonLocalTend(:,k,iCell) / layerThicknessNew(k,iCell)
                   end do
                end do
                !$omp end do

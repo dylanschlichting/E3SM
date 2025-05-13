@@ -37,6 +37,7 @@
 	<package name="numericalMixingTracersExponentialDecayPKG" description="This package includes variables required to compute exponential decay on the numerical mixing tracer group."/>
 	<package name="numericalMixingTracersIdealAgePKG" description="This package includes variables required to compute ideal age forcing on the numerical mixing tracer group."/>
 	<package name="numericalMixingTracersTTDPKG" description="This package includes variables required to compute transit-time distribution forcing on the numerical mixing tracer group."/>
+	<package name="numericalMixingTracersBudgetPKG" description="This package includes variables required to compute numerical mixing tracer budget"/>
 </packages>
 
 <var_struct name="state" time_levs="2">
@@ -149,7 +150,7 @@
 		<var name = "passiveSalinityHorAdvTend" array_group="numericalMixingTracersHorAdvTend" units="1.e-3 s^-1"
 		description="passive salinity tendency due to horizontal advection"
 		/>
-		<var name = "passiveTemperatureSquaredHorAdvTend" array_group="numericalMixingTracersHorAdvTend" units="{1.e-3}^2 s^-1"/
+		<var name = "passiveTemperatureSquaredHorAdvTend" array_group="numericalMixingTracersHorAdvTend" units="{1.e-3}^2 s^-1"
 		description="passive temperature squared tendency due to horizontal advection"
 		>
 		<var name = "passiveSalinitySquaredHorAdvTend" array_group="numericalMixingTracersHorAdvTend" units="C^2 s^-1"
@@ -163,7 +164,7 @@
 		<var name = "passiveSalinityVerAdvTend" array_group="numericalMixingTracersVerAdvTend" units="1.e-3 s^-1"
 		description="passive salinity tendency due to vertical advection"
 		/>
-		<var name = "passiveTemperatureSquaredVerAdvTend" array_group="numericalMixingTracersVerAdvTend" units="{1.e-3}^2 s^-1"/
+		<var name = "passiveTemperatureSquaredVerAdvTend" array_group="numericalMixingTracersVerAdvTend" units="{1.e-3}^2 s^-1"
 		description="passive temperature squared tendency due to vertical advection"
 		>
 		<var name = "passiveSalinitySquaredVerAdvTend" array_group="numericalMixingTracersVerAdvTend" units="C^2 s^-1"
