@@ -13,7 +13,7 @@
 !> \author Matt Turner
 !> \date   13 May 2020
 !> \details
-!>  This module contains the definitions of all variables contianed in the
+!>  This module contains the definitions of all variables contained in the
 !>  diagnosticsPool, and also gets the variables from the Pool in init.
 !
 !-----------------------------------------------------------------------
@@ -172,7 +172,9 @@ module ocn_diagnostics_variables
       activeTracerVerticalAdvectionTendency,   &
       activeTracerHorizontalAdvectionEdgeFlux, &
       activeTracerVerticalAdvectionTopFlux,    &
-      activeTracerVertMixTendency
+      activeTracerVertMixTendency,             &
+      numericalMixingTracersHorAdvTend,        &
+      numericalMixingTracersVertAdvTend
 
    real (kind=RKIND), pointer :: daysSinceStartOfSim
    real (kind=RKIND), pointer :: Time
@@ -351,6 +353,11 @@ contains
                   'salinitySurfaceRestoringTendency', &
                    salinitySurfaceRestoringTendency)
       end if
+
+      if ( config_use_numericalMixingTracers ) then
+         call mpas_pool_get_array(diagnosticsPool,'numericalMixingTracersHorAdvTend',numericalMixingTracersHorAdvTend)
+         call mpas_pool_get_array(diagnosticsPool,'numericalMixingTracersVerAdvTend',numericalMixingTracersVerAdvTend)
+      endif
 
       ! Retrieve pointers for configurations where land_ice_flux_mode is enabled
       if ( trim(config_land_ice_flux_mode) /= 'off' ) then

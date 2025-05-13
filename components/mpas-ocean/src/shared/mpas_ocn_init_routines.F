@@ -106,7 +106,7 @@ contains
       real (kind=RKIND), dimension(:,:), pointer :: layerThickness
       real (kind=RKIND), dimension(:,:), pointer :: normalVelocity
 
-      real (kind=RKIND), dimension(:,:,:), pointer :: tracersGroup
+      real (kind=RKIND), dimension(:,:,:), pointer :: tracersGroup, tracersGroupNew
 
       integer, pointer :: nCells, nEdges, nVertices, nVertLevels
 
