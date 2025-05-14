@@ -1823,12 +1823,13 @@ module ocn_time_integration_split_ab2
                                                 normalVelocityCur, 1)
          call mpas_pool_get_array(tracersTendPool,'activeTracersTend', &
                                                    activeTracersTend)
-         call mpas_pool_get_array(tracersTendPool, &
-                                  'numericalMixingTracersHorAdvTend', &
-                                   numericalMixingTracersVerAdvTend)
-         call mpas_pool_get_array(tracersTendPool, &
-                                  'numericalMixingTracersVerAdvTend', &
-                                   numericalMixingTracersVerAdvTend)
+         ! call mpas_pool_get_array(tracersTendPool, &
+         !                          'numericalMixingTracersHorAdvTend', &
+         !                           numericalMixingTracersVerAdvTend)
+         ! call mpas_pool_get_array(diagnosticsPool, &
+                                 !  'numericalMixingTracersHorAdvTend', &
+                                 !   numericalMixingTracersVerAdvTend)
+         ! print *, 'mnum ab2 tracer tend is', numericalMixingTracersVerAdvTend
 
 #ifdef MPAS_OPENACC
          !$acc enter data copyin(layerThicknessNew, normalVelocityNew)
@@ -2373,16 +2374,13 @@ module ocn_time_integration_split_ab2
                !$omp do schedule(runtime) private(k)
                do iCell = 1, nCells
                   do k= 1, maxLevelCell(iCell)
-                     numericalMixingTracersHorAdvTend(:,k,iCell) = 0.0_RKIND!numericalMixingTracersHorAdvTend(:,k,iCell) / layerThicknessNew(k,iCell)
-                     numericalMixingTracersVerAdvTend(:,k,iCell)  = 0.0_RKIND!numericalMixingTracersVerAdvTend(:,k,iCell) / layerThicknessNew(k,iCell)
+                     numericalMixingTracersHorAdvTend(:,k,iCell) = numericalMixingTracersHorAdvTend(:,k,iCell) / layerThicknessNew(k,iCell)
+                     numericalMixingTracersVerAdvTend(:,k,iCell)  = numericalMixingTracersVerAdvTend(:,k,iCell) / layerThicknessNew(k,iCell)
                   end do
                end do
                !$omp end do
                !$omp end parallel
             endif
-
-            deallocate(numericalMixingTracersHorAdvTend)
-            deallocate(numericalMixingTracersVerAdvTend)
 
             call mpas_pool_begin_iteration(tracersPool)
             do while (mpas_pool_get_next_member(tracersPool, &

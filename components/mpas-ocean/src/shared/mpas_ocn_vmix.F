@@ -1627,7 +1627,7 @@ contains
                   end if
 
                else
-                  print *, 'Skipping vmix implicit call for tracerGroup = ', groupItr % memberName
+                  ! print *, 'Skipping vmix implicit call for tracerGroup = ', groupItr % memberName
                end if
 
 #ifdef MPAS_OPENACC

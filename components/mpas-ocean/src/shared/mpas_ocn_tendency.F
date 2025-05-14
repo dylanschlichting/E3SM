@@ -1430,7 +1430,7 @@ contains
             endif ! KPP
 
          else
-            print *, 'Skipping ocn_tracer_vmix_tend_nonlocal for tracerGroup = ', groupItr % memberName   
+            ! print *, 'Skipping ocn_tracer_vmix_tend_nonlocal for tracerGroup = ', groupItr % memberName   
          endif
 
          ! Compute tracer tendency due to production/destruction of
@@ -1439,7 +1439,7 @@ contains
             call ocn_frazil_forcing_tracers(meshPool, tracersPool, &
                                             groupName, forcingPool, tracerGroupTend, err)
          else
-            print *, 'Skipping ocn_frazil_forcing_tracers for tracerGroup = ', groupItr % memberName
+            ! print *, 'Skipping ocn_frazil_forcing_tracers for tracerGroup = ', groupItr % memberName
          endif
 
 
