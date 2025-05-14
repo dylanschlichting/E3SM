@@ -135,11 +135,6 @@ module ocn_tracer_advection_mono
          lowOrderFlx,   &! low order flux for FCT
          highOrderFlx    ! high order flux for FCT
 
-      ! pointers for tendencies used in diagnostic budget computation
-      real (kind=RKIND), dimension(:,:,:), pointer :: &
-         numericalMixingTracersHorAdvTend,    &
-         numericalMixingTracersVerAdvTend
-
       real (kind=RKIND), parameter :: &
          eps = 1.e-10_RKIND  ! small number to avoid numerical difficulties
 
@@ -162,11 +157,9 @@ module ocn_tracer_advection_mono
                hProvInv    (nVertLevels  ,nCellsAll), &
                flxIn       (nVertLevels  ,nCellsAll+1), &
                flxOut      (nVertLevels  ,nCellsAll+1), &
-               workTend    (nVertLevels  ,nCellsAll+1), &
+               workTend    (nVertLevels  ,nCellsAll+1), & 
                lowOrderFlx (nVertLevels+1,max(nCellsAll,nEdgesAll)+1), &
-               highOrderFlx(nVertLevels+1,max(nCellsAll,nEdgesAll)+1), & 
-               numericalMixingTracersHorAdvTend(4, nVertLevels  ,nCellsAll+1), &
-               numericalMixingTracersVerAdvTend(4, nVertLevels  ,nCellsAll+1))
+               highOrderFlx(nVertLevels+1,max(nCellsAll,nEdgesAll)+1))
 
 
       !$acc enter data create(tracerCur, tracerMin, tracerMax, &
@@ -572,7 +565,8 @@ module ocn_tracer_advection_mono
            !$omp do schedule(runtime) private(k)
            do iCell = 1, nCellsOwned
              do k = 1, maxLevelCell(iCell)
-                 numericalMixingTracersHorAdvTend(iTracer,k,iCell) = 0.0_RKIND! workTend(k,iCell)
+                 numericalMixingTracersHorAdvTend(iTracer,k,iCell) = workTend(k,iCell)
+                !  print *, 'numericalMixingTracersHorAdvTend = ', numericalMixingTracersHorAdvTend(iTracer,k,iCell)
              end do
            end do ! iCell loop
            !$omp end do
@@ -908,7 +902,7 @@ module ocn_tracer_advection_mono
            !$omp do schedule(runtime) private(k)
            do iCell = 1, nCellsOwned
              do k = 1, maxLevelCell(iCell)
-                 numericalMixingTracersVerAdvTend(iTracer,k,iCell) = 0.0_RKIND!workTend(k,iCell)
+                 numericalMixingTracersVerAdvTend(iTracer,k,iCell) = workTend(k,iCell)
              end do
            end do ! iCell loop
         end if
@@ -1020,9 +1014,7 @@ module ocn_tracer_advection_mono
                  flxOut,       &
                  workTend,     &
                  lowOrderFlx,  &
-                 highOrderFlx, & 
-                 numericalMixingTracersHorAdvTend, &
-                 numericalMixingTracersVerAdvTend)
+                 highOrderFlx)
 
 #ifdef _ADV_TIMERS
       call mpas_timer_stop('deallocates')
