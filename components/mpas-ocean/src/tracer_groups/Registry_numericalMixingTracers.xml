@@ -102,7 +102,7 @@
 			<var name="passiveSalinitySurfaceFluxRunoff" array_group="numericalMixingSurfaceFluxesRunoffGRP" units="1.e-3 m s^-1"
 			description="Flux of salinity through the ocean surface due to river runoff. Positive into ocean."
 			/>
-			<var name="passiveTemperatureßSquaredeSurfaceFluxRunoff" array_group="numericalMixingSurfaceFluxesRunoffGRP" units="C^2 m s^-1"
+			<var name="passiveTemperatureSquaredSurfaceFluxRunoff" array_group="numericalMixingSurfaceFluxesRunoffGRP" units="C^2 m s^-1"
 			description="Flux of temperature squared through the ocean surface due to river runoff. Positive into ocean."
 			/>
 			<var name="passiveSalinitySquaredSurfaceFluxRunoff" array_group="numericalMixingSurfaceFluxesRunoffGRP" units="{1.e-3}^2 m s^-1"
@@ -152,7 +152,7 @@
 		/>
 		<var name = "passiveTemperatureSquaredHorAdvTend" array_group="numericalMixingTracersHorAdvTend" units="{1.e-3}^2 s^-1"
 		description="passive temperature squared tendency due to horizontal advection"
-		>
+		/>
 		<var name = "passiveSalinitySquaredHorAdvTend" array_group="numericalMixingTracersHorAdvTend" units="C^2 s^-1"
 		description="passive salinity squared tendency due to horizontal advection"
 		/>
@@ -166,7 +166,7 @@
 		/>
 		<var name = "passiveTemperatureSquaredVerAdvTend" array_group="numericalMixingTracersVerAdvTend" units="{1.e-3}^2 s^-1"
 		description="passive temperature squared tendency due to vertical advection"
-		>
+		/>
 		<var name = "passiveSalinitySquaredVerAdvTend" array_group="numericalMixingTracersVerAdvTend" units="C^2 s^-1"
 		description="passive salinity squared tendency due to vertical advection"
 		/>

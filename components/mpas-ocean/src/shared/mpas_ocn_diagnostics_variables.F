@@ -910,6 +910,12 @@ contains
          !$acc                   activeTracerHorizontalAdvectionEdgeFlux  &
          !$acc                   )
       end if
+      if ( config_use_numericalMixingTracers ) then
+         !$acc enter data create(                                         &
+         !$acc                   numericalMixingTracersHorAdvTend,   &
+         !$acc                   numericalMixingTracersVerAdvTend, &
+         !$acc                   )
+      end if
       if ( config_use_activeTracers_surface_restoring ) then
          !$acc enter data create(                                  &
          !$acc                   salinitySurfaceRestoringTendency  &
@@ -1168,6 +1174,12 @@ contains
          !$acc                   activeTracerVerticalAdvectionTendency,   &
          !$acc                   activeTracerHorizontalAdvectionTendency, &
          !$acc                   activeTracerHorizontalAdvectionEdgeFlux  &
+         !$acc                   )
+      end if
+         if ( config_use_numericalMixingTracers ) then
+         !$acc exit data delete(                                   &
+         !$acc                   numericalMixingTracersHorAdvTend, &
+         !$acc                   numericalMixingTracersVerAdvTend, &
          !$acc                   )
       end if
       if ( config_use_activeTracers_surface_restoring ) then

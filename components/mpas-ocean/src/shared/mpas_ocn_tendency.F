@@ -1223,7 +1223,7 @@ contains
          ! Tracer budget is computed and stored within the tracer adv
          ! routine
          computeNumericalMixingTracers = ( trim(groupItr % memberName) == 'numericalMixingTracers' )
-         print *, 'Numerical mixing tracers = ', computeNumericalMixingTracers
+         ! print *, 'Numerical mixing tracers = ', computeNumericalMixingTracers
 
          call ocn_tracer_advection_tend(tracerGroup, &
                             normalThicknessFlux, vertAleTransportTop, &
@@ -1272,9 +1272,9 @@ contains
                                     limiterDown, dt, isActiveTracer, &
                                     rediLimiterCount, &
                                     tracerGroupTend, err)
-            print *, 'Calculating ocn_tracer_hmix_tend for tracerGroup =', groupItr % memberName                         
+            ! print *, 'Calculating ocn_tracer_hmix_tend for tracerGroup =', groupItr % memberName                         
          else
-            print *, 'Skipping ocn_tracer_hmix_tend for tracerGroup = ', groupItr % memberName    
+            ! print *, 'Skipping ocn_tracer_hmix_tend for tracerGroup = ', groupItr % memberName    
          end if
          
          if (computeBudgets) then

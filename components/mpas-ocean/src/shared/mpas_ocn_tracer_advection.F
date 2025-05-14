@@ -89,11 +89,11 @@ module ocn_tracer_advection
       logical, intent(in) :: &
          computeBudgets      ! flag to compute active tracer budget
 
-      logical, intent(in) :: &
-         computeNumericalMixingTracers  ! flag to compute numericalMixingTracers
-
       logical, dimension(:), intent(in) :: &
          skipTracer          ! flag to skip tracer in tracers
+
+      logical, intent(in) :: &
+         computeNumericalMixingTracers  ! flag to compute numericalMixingTracers
 
       ! end of preamble
       !----------------
