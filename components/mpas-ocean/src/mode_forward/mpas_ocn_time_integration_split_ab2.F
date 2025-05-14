@@ -280,7 +280,7 @@ module ocn_time_integration_split_ab2
       
       real (kind=RKIND), dimension(:,:,:), pointer :: &
          numericalMixingTracersHorAdvTend,      &
-         numericalMixingTracersVertAdvTend  
+         numericalMixingTracersVerAdvTend  
 
       ! Forcing pool
       real (kind=RKIND), dimension(:), pointer :: tidalPotentialEta
@@ -296,6 +296,8 @@ module ocn_time_integration_split_ab2
       ! Remap variables
       real (kind=RKIND), dimension(:,:), pointer :: &
          layerThicknessLagNew
+
+      integer, dimension(3) :: dims
 
       ! These are public variables used from the diagnostics module
       ! indexSurfaceVelocityZonal, indexSurfaceVelocityMeridional
@@ -316,6 +318,8 @@ module ocn_time_integration_split_ab2
       ! activeTracerNonLocalTendency
       ! activeTracerHorMixTendency
       ! activeTracerHorizontalAdvectionEdgeFlux
+      ! numericalMixingTracersHorAdvTend
+      ! numericalMixingTracersVerAdvTend
       ! vertVelocityTop
 
       ! End preamble
@@ -417,12 +421,17 @@ module ocn_time_integration_split_ab2
                                           lowFreqDivergenceTend)
 
       call mpas_pool_get_array(tracersPool, 'activeTracers', activeTracersNew, 2)
+      call mpas_pool_get_array(tracersPool, 'numericalMixingTracers', numericalMixingTracers, 1)
       
       ! Set the numerical mixing tracers = to the active tracers. Order is temp, salt, temp**2,salt**2
-      ! numericalMixingTracers(1,:,:) = activeTracersNew(indexTemperature,:,:)
-      ! numericalMixingTracers(2,:,:) = activeTracersNew(indexSalinity,:,:)
-      ! numericalMixingTracers(3,:,:) = activeTracersNew(indexTemperature,:,:)**2
-      ! numericalMixingTracers(4,:,:) = activeTracersNew(indexSalinity,:,:)**2
+      dims = shape(numericalMixingTracers)
+
+      if ( config_use_numericalMixingTracers ) then
+         numericalMixingTracers(1,:,:) = activeTracersNew(indexTemperature,:,:)
+         numericalMixingTracers(2,:,:) = activeTracersNew(indexSalinity,:,:)
+         numericalMixingTracers(3,:,:) = activeTracersNew(indexTemperature,:,:)**2
+         numericalMixingTracers(4,:,:) = activeTracersNew(indexSalinity,:,:)**2
+      end if 
 
       allocate(bottomDepthEdge(nEdgesAll+1))
 
@@ -1814,6 +1823,12 @@ module ocn_time_integration_split_ab2
                                                 normalVelocityCur, 1)
          call mpas_pool_get_array(tracersTendPool,'activeTracersTend', &
                                                    activeTracersTend)
+         call mpas_pool_get_array(tracersTendPool, &
+                                  'numericalMixingTracersHorAdvTend', &
+                                   numericalMixingTracersVerAdvTend)
+         call mpas_pool_get_array(tracersTendPool, &
+                                  'numericalMixingTracersVerAdvTend', &
+                                   numericalMixingTracersVerAdvTend)
 
 #ifdef MPAS_OPENACC
          !$acc enter data copyin(layerThicknessNew, normalVelocityNew)
@@ -2350,19 +2365,24 @@ module ocn_time_integration_split_ab2
             !$acc update host(activeTracersNew)
             !$acc update host(tracersSurfaceValue)
 #endif
-
+            allocate(numericalMixingTracersHorAdvTend(dims(1), dims(2), dims(3)))
+            allocate(numericalMixingTracersVerAdvTend(dims(1), dims(2), dims(3)))
+            
             if ( config_use_numericalMixingTracers ) then
                !$omp parallel
                !$omp do schedule(runtime) private(k)
                do iCell = 1, nCells
                   do k= 1, maxLevelCell(iCell)
-                     numericalMixingTracersHorAdvTend(:,k,iCell) = numericalMixingTracersHorAdvTend(:,k,iCell) / layerThicknessNew(k,iCell)
-                     numericalMixingTracersVertAdvTend(:,k,iCell)  = numericalMixingTracersVertAdvTend(:,k,iCell) / layerThicknessNew(k,iCell)
+                     numericalMixingTracersHorAdvTend(:,k,iCell) = 0.0_RKIND!numericalMixingTracersHorAdvTend(:,k,iCell) / layerThicknessNew(k,iCell)
+                     numericalMixingTracersVerAdvTend(:,k,iCell)  = 0.0_RKIND!numericalMixingTracersVerAdvTend(:,k,iCell) / layerThicknessNew(k,iCell)
                   end do
                end do
                !$omp end do
                !$omp end parallel
             endif
+
+            deallocate(numericalMixingTracersHorAdvTend)
+            deallocate(numericalMixingTracersVerAdvTend)
 
             call mpas_pool_begin_iteration(tracersPool)
             do while (mpas_pool_get_next_member(tracersPool, &

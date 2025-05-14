@@ -136,7 +136,7 @@ module ocn_tracer_advection_mono
          highOrderFlx    ! high order flux for FCT
 
       ! pointers for tendencies used in diagnostic budget computation
-      real (kind=RKIND), dimension(:,:,:), pointer, contiguous :: &
+      real (kind=RKIND), dimension(:,:,:), pointer :: &
          numericalMixingTracersHorAdvTend,    &
          numericalMixingTracersVerAdvTend
 
@@ -164,7 +164,10 @@ module ocn_tracer_advection_mono
                flxOut      (nVertLevels  ,nCellsAll+1), &
                workTend    (nVertLevels  ,nCellsAll+1), &
                lowOrderFlx (nVertLevels+1,max(nCellsAll,nEdgesAll)+1), &
-               highOrderFlx(nVertLevels+1,max(nCellsAll,nEdgesAll)+1))
+               highOrderFlx(nVertLevels+1,max(nCellsAll,nEdgesAll)+1), & 
+               numericalMixingTracersHorAdvTend(4, nVertLevels  ,nCellsAll+1), &
+               numericalMixingTracersVerAdvTend(4, nVertLevels  ,nCellsAll+1))
+
 
       !$acc enter data create(tracerCur, tracerMin, tracerMax, &
       !$acc                   hNewInv, hProv, hProvInv, flxIn, flxOut, &
@@ -558,23 +561,29 @@ module ocn_tracer_advection_mono
            end do
 
         end do ! iCell loop
-#ifndef MPAS_OPENACC
-        !$omp end do
-        !$omp end parallel
-#endif
-        
+
         if (computeNumericalMixingTracers) then
+        !    print *, 'iTracer = ', iTracer
+        !    print *, 'Shape of numericalMixingTracers:', SHAPE(numericalMixingTracersHorAdvTend)   
+        !    print *, 'nCellsOwned = ', nCellsOwned
+        !    print *, 'nCells = ', nCells
+        !    print *, 'Shape of workTend: ', SHAPE(workTend)
            !$omp parallel
            !$omp do schedule(runtime) private(k)
-           do iCell = 1, nCells
+           do iCell = 1, nCellsOwned
              do k = 1, maxLevelCell(iCell)
-                 numericalMixingTracersHorAdvTend(iTracer,k,iCell) = workTend(k,iCell)
+                 numericalMixingTracersHorAdvTend(iTracer,k,iCell) = 0.0_RKIND! workTend(k,iCell)
              end do
            end do ! iCell loop
            !$omp end do
            !$omp end parallel
         end if
 
+#ifndef MPAS_OPENACC
+        !$omp end do
+        !$omp end parallel
+#endif
+     
 #ifdef _ADV_TIMERS
         call mpas_timer_stop('flux accumulate')
         call mpas_timer_start('advect diags horiz')
@@ -897,9 +906,9 @@ module ocn_tracer_advection_mono
         if (computeNumericalMixingTracers) then
            !$omp parallel
            !$omp do schedule(runtime) private(k)
-           do iCell = 1, nCells
+           do iCell = 1, nCellsOwned
              do k = 1, maxLevelCell(iCell)
-                 numericalMixingTracersVerAdvTend(iTracer,k,iCell) = workTend(k,iCell)
+                 numericalMixingTracersVerAdvTend(iTracer,k,iCell) = 0.0_RKIND!workTend(k,iCell)
              end do
            end do ! iCell loop
         end if
@@ -1011,7 +1020,9 @@ module ocn_tracer_advection_mono
                  flxOut,       &
                  workTend,     &
                  lowOrderFlx,  &
-                 highOrderFlx)
+                 highOrderFlx, & 
+                 numericalMixingTracersHorAdvTend, &
+                 numericalMixingTracersVerAdvTend)
 
 #ifdef _ADV_TIMERS
       call mpas_timer_stop('deallocates')
