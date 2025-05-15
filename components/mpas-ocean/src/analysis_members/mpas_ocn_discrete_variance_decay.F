@@ -202,7 +202,7 @@ module ocn_discrete_variance_decay
  
        integer, dimension(:), pointer :: maxLevelCell, maxLevelEdgeTop, maxLevelVertexBot
        integer, pointer :: index_temperature, index_salinity, & 
-       nVertLevels, nCells, nEdgesSolve, nVerticesSolve
+       nVertLevels, nVertLevelsP1, nCells, nEdgesSolve, nVerticesSolve
        integer :: iTracer, k, iCell
 
        logical, pointer :: config_cvmix_background_diffusion_enable
@@ -229,6 +229,7 @@ module ocn_discrete_variance_decay
           call mpas_pool_get_subpool(block%structs, 'discreteVarianceDecayAM', discreteVarianceDecayAMPool)
 
           call mpas_pool_get_dimension(block%dimensions, 'nVertLevels', nVertLevels)
+          call mpas_pool_get_dimension(block%dimensions, 'nVertLevelsP1', nVertLevelsP1)
           call mpas_pool_get_dimension(block%dimensions, 'nCells', nCells)
 
           call mpas_pool_get_array(tracersPool, 'activeTracers', activeTracers, 1)
@@ -249,10 +250,11 @@ module ocn_discrete_variance_decay
           call mpas_pool_get_array(discreteVarianceDecayAMPool, 'chiPhyVerSalt', chiPhyVerSalt) 
           call mpas_pool_get_array(discreteVarianceDecayAMPool, 'chiPhyVerTemp', chiPhyVerTemp)
 
-          ! Interpolate vertical diffusivity from top of cell to middle of layer
-          allocate(vertDiffMid(nVertLevels-1, nCells))
+          ! Interpolate vertical diffusivity from top of cell to middle of layer. Since vertDiffTopofCell
+          ! has vshape nVertLevelsP1, vertDiffMid should have shape nVertLevels
+          allocate(vertDiffMid(nVertLevels, nCells))
           do iCell = 1, nCells
-             do k = 1, nVertLevels-1
+             do k = 1, nVertLevels
                  vertDiffMid(k,iCell) = ( vertDiffTopOfCell(k,iCell) + vertDiffTopOfCell(k+1,iCell)) / 2.0d0
              end do
           end do
@@ -354,10 +356,12 @@ module ocn_discrete_variance_decay
  !> \author  Dylan Schlichting
  !> \date    April-May 2025
  !> \details
- !>  Computes the vertical gradient of a scalar field.
+ !>  Computes the vertical gradient of a scalar field. 
  !>  Modified from mpas_ocn_eliassen_palm.F with help from ChatGPT
  !>  so that firstLayer is always 1 and the last layer is the total 
- !>  number of vertical layers.
+ !>  number of vertical layers. Uses a forward difference in physical space
+ !>  for the first and last layers, and a centered difference in the middle 
+ !>  middle layers.
  !-----------------------------------------------------------------------
 
     subroutine computeVerticalDerivative(nCells, nVertLevels, heightMid, field, derivativeField)
