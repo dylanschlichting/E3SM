@@ -1823,14 +1823,6 @@ module ocn_time_integration_split_ab2
                                                 normalVelocityCur, 1)
          call mpas_pool_get_array(tracersTendPool,'activeTracersTend', &
                                                    activeTracersTend)
-         ! call mpas_pool_get_array(tracersTendPool, &
-         !                          'numericalMixingTracersHorAdvTend', &
-         !                           numericalMixingTracersVerAdvTend)
-         ! call mpas_pool_get_array(diagnosticsPool, &
-                                 !  'numericalMixingTracersHorAdvTend', &
-                                 !   numericalMixingTracersVerAdvTend)
-         ! print *, 'mnum ab2 tracer tend is', numericalMixingTracersVerAdvTend
-
 #ifdef MPAS_OPENACC
          !$acc enter data copyin(layerThicknessNew, normalVelocityNew)
          !$acc enter data copyin(normalBarotropicVelocityNew, &
