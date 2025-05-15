@@ -30,7 +30,7 @@
 !>   Vertical gradients modified from Eliassen Palm analysis member,
 !>   Vertical diffusion coefficient imported from vertical mixing 
 !>   To do: Add support for explict horizontal mixing, which is not used 
-!>   by default. Add GM + Redi support
+!>   by default. Add GM + Redi support. Add K14 method
 !-----------------------------------------------------------------------
 
 module ocn_discrete_variance_decay
@@ -45,7 +45,7 @@ module ocn_discrete_variance_decay
     use ocn_constants
     use ocn_diagnostics_variables
     use ocn_vmix
- 
+    use mpas_log
     implicit none
     private
     save
@@ -179,20 +179,27 @@ module ocn_discrete_variance_decay
        type(mpas_pool_type), pointer :: diagnosticsPool
 
        real(kind=RKIND), dimension(:,:,:), pointer :: activeTracers
+       real(kind=RKIND), dimension(:,:,:), pointer :: numericalMixingTracersHorAdvTend
+       real(kind=RKIND), dimension(:,:,:), pointer :: numericalMixingTracersVerAdvTend
        real(kind=RKIND), dimension(:,:,:), pointer :: tracers
- 
-       ! Here are some example variables which may be needed for your analysis member
-       real(kind=RKIND), dimension(:,:), pointer :: dTdz
-       real(kind=RKIND), dimension(:,:), pointer :: dsdz
-       real(kind=RKIND), dimension(:,:), pointer :: vertDiffTopOfCell
-       real(kind=RKIND), dimension(:, :), pointer :: chiPhyVerSalt, chiPhyVerTemp
+       real(kind=RKIND), dimension(:,:,:), pointer :: chiSpurHorTracerBR08
+       real(kind=RKIND), dimension(:,:,:), pointer :: chiSpurVerTracerBR08
+
+       ! Vert temp & salt grad, vert diffusivity
+       real(kind=RKIND), dimension(:,:), pointer :: dTdz, dsdz, vertDiffTopOfCell
+       ! Vertical destruction of salt and temp variance
+       real(kind=RKIND), dimension(:,:), pointer :: chiPhyVerSalt, chiPhyVerTemp
        real(kind=RKIND), dimension(:), pointer :: areaCell, bottomDepth
        real(kind=RKIND), pointer :: config_cvmix_background_diffusion
-       real(kind=RKIND), allocatable :: vertDiffMid(:,:)
+
        real(kind=RKIND) :: backgroundDiff
-       real(kind=RKIND), dimension(:,:), allocatable :: tmp2D
-       real(kind=RKIND), dimension(:,:), allocatable :: sal2D
-       
+       ! Temporary arrays for intermediate cals
+       real(kind=RKIND), dimension(:,:), allocatable :: tmp2D, sal2D, Aht2, Ahs2, &
+                                                        Aht_2, Ahs_2, Avt2, Avs2, &
+                                                        Avt_2, Avs_2
+       ! Interpolated diffusivity @ mid layer of cell
+       real(kind=RKIND), allocatable :: vertDiffMid(:,:)
+ 
        integer, dimension(:), pointer :: maxLevelCell, maxLevelEdgeTop, maxLevelVertexBot
        integer, pointer :: index_temperature, index_salinity, & 
        nVertLevels, nCells, nEdgesSolve, nVerticesSolve
@@ -200,9 +207,18 @@ module ocn_discrete_variance_decay
 
        logical, pointer :: config_cvmix_background_diffusion_enable
 
+       character(len=StrKIND), pointer :: config_dt
+       type (MPAS_timeInterval_type) :: timeStepESMF
+       real (kind=RKIND) :: dt
+
        err = 0
  
        dminfo = domain%dminfo
+       ! Convert dt to real
+      !  call mpas_set_timeInterval(timeStepESMF, timeString=config_dt, ierr=err)
+      !  call mpas_get_timeInterval(timeStepESMF, dt=dt)
+       dt = 3600.0_RKIND
+      !  print *, 'dt = ', dt
  
        block => domain%blocklist
        do while (associated(block))
@@ -226,8 +242,12 @@ module ocn_discrete_variance_decay
           call mpas_pool_get_array(meshPool, 'areaCell', areaCell)
 
           call mpas_pool_get_array(diagnosticsPool, 'vertDiffTopOfCell', vertDiffTopOfCell)
+          call mpas_pool_get_array(diagnosticsPool, 'numericalMixingTracersHorAdvTend', numericalMixingTracersHorAdvTend)
+          call mpas_pool_get_array(diagnosticsPool, 'numericalMixingTracersVerAdvTend', numericalMixingTracersVerAdvTend)
+          call mpas_pool_get_array(discreteVarianceDecayAMPool, 'chiSpurHorTracerBR08', chiSpurHorTracerBR08) 
+          call mpas_pool_get_array(discreteVarianceDecayAMPool, 'chiSpurVerTracerBR08', chiSpurVerTracerBR08) 
           call mpas_pool_get_array(discreteVarianceDecayAMPool, 'chiPhyVerSalt', chiPhyVerSalt) 
-          call mpas_pool_get_array(discreteVarianceDecayAMPool, 'chiPhyVerTemp', chiPhyVerTemp) 
+          call mpas_pool_get_array(discreteVarianceDecayAMPool, 'chiPhyVerTemp', chiPhyVerTemp)
 
           ! Interpolate vertical diffusivity from top of cell to middle of layer
           allocate(vertDiffMid(nVertLevels-1, nCells))
@@ -239,14 +259,14 @@ module ocn_discrete_variance_decay
 
           ! Computer vertical temperature gradient
           ! Initialize temp, salt, and their derivatives
-          allocate(tmp2D(nCells, nVertLevels))
-          allocate(dTdz(nVertLevels, nCells))
+          allocate(tmp2D(nVertLevels,nCells))
+          allocate(dTdz(nVertLevels,nCells))
           tmp2D = activeTracers(index_temperature, :, :)
           call computeVerticalDerivative(nCells, nVertLevels, zMid, & 
                                          tmp2D, dTdz)
 
-          allocate(sal2D(nCells, nVertLevels))
-          allocate(dsdz(nVertLevels, nCells))
+          allocate(sal2D(nVertLevels,nCells))
+          allocate(dsdz(nVertLevels,nCells))
           sal2D = activeTracers(index_salinity, :, :)
           ! Computer vertical salinity gradient
           call computeVerticalDerivative(nCells, nVertLevels, zMid, & 
@@ -272,16 +292,57 @@ module ocn_discrete_variance_decay
           
           ! Local estimates of horizontal physical mixing due to laplacian diffusion 
           ! Local estimates of horizontal physical mixing due to biharmonic diffusion 
-          ! Local estimates of redi diffusion 
+          ! Local estimates of physical mixing due to redi diffusion 
 
           ! Local estimates of numerical mixing following Burchard & Rennau (2008) O.M.
-         ! AdvectedTracerSquared = 
-         ! SquareAdvectedTracer
-         ! chiSpurBR08 = (AdvectedTracerSquared-SquareAdvectedTracer) / config_dt
+          ! Mnum = [ A{c**2} - (A{c})**2 ] / dt_baroclinic 
+          ! Order of the mnum tracer tendencies is temp, salt, temp**2,salt**2. Note the
+          ! advective tendencies have units of tracer or tracer^2 per time, so we multiply by dt
+          ! A{c**2} is numericalMixingTracersAdvTend(3:4,:,:) * dt
+          ! (A{c})**2 is (numericalMixingTracersAdvTend(1:2,:,:) * dt)**2
 
+          ! Allocate intermediate arrays for mnum calcs
+          allocate(Aht2(nVertLevels, nCells))
+          allocate(Ahs2(nVertLevels, nCells))
+          allocate(Aht_2(nVertLevels, nCells))
+          allocate(Ahs_2(nVertLevels, nCells))
+
+          allocate(Avt2(nVertLevels, nCells))
+          allocate(Avs2(nVertLevels, nCells))
+          allocate(Avt_2(nVertLevels, nCells))
+          allocate(Avs_2(nVertLevels, nCells))
+          
+          Aht2 = (numericalMixingTracersHorAdvTend(1,:,:)*dt)**2
+          Ahs2 = (numericalMixingTracersHorAdvTend(2,:,:)*dt)**2
+          Aht_2 = (numericalMixingTracersHorAdvTend(3,:,:)*dt)
+          Ahs_2 = (numericalMixingTracersHorAdvTend(4,:,:)*dt)
+
+          Avt2 = (numericalMixingTracersVerAdvTend(1,:,:)*dt)**2
+          Avs2 = (numericalMixingTracersVerAdvTend(2,:,:)*dt)**2
+          Avt_2 = (numericalMixingTracersVerAdvTend(3,:,:)*dt)
+          Avs_2 = (numericalMixingTracersVerAdvTend(4,:,:)*dt)
+
+          !Horizontal mnum 
+          chiSpurHorTracerBR08(1,:,:) = (Aht_2-Aht2)/dt
+          chiSpurHorTracerBR08(2,:,:) = (Ahs_2-Ahs2)/dt
+          !Vertical mnum
+          chiSpurVerTracerBR08(1,:,:) = (Avt_2-Avt2)/dt
+          chiSpurVerTracerBR08(2,:,:) = (Avs_2-Avs2)/dt
+
+         !  print *, 'Total mnum for temp is: ', (chiSpurHorTracerBR08(1,:,:)+chiSpurVerTracerBR08(1,:,:))
+         !  print *, 'Total mnum for temp is: ', (chiSpurHorTracerBR08(2,:,:)+chiSpurVerTracerBR08(2,:,:))
+
+         !  print *, 'Shape of numericalMixingTracersHorAdvTend:'
+         !  print *, '  dim 1 (should be 4): ', size(numericalMixingTracersHorAdvTend, 1)
+         !  print *, '  dim 2 (should be nVertLevels): ', size(numericalMixingTracersHorAdvTend, 2)
+         !  print *, '  dim 3 (should be nCells): ', size(numericalMixingTracersHorAdvTend, 3)
+          ! Temp 
           block => block%next
        end do
-       deallocate(vertDiffMid)
+
+      !  deallocate(vertDiffMid)
+      !  deallocate(numericalMixingTracersHorAdvTendDt)
+      !  deallocate(numericalMixingTracersVerAdvTendDt)
  
     end subroutine ocn_compute_discrete_variance_decay!}}}
 
