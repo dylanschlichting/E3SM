@@ -331,20 +331,8 @@ module ocn_discrete_variance_decay
           chiSpurVerTracerBR08(1,:,:) = (Avt_2-Avt2)/dt
           chiSpurVerTracerBR08(2,:,:) = (Avs_2-Avs2)/dt
 
-         !  print *, 'Total mnum for temp is: ', (chiSpurHorTracerBR08(1,:,:)+chiSpurVerTracerBR08(1,:,:))
-         !  print *, 'Total mnum for temp is: ', (chiSpurHorTracerBR08(2,:,:)+chiSpurVerTracerBR08(2,:,:))
-
-         !  print *, 'Shape of numericalMixingTracersHorAdvTend:'
-         !  print *, '  dim 1 (should be 4): ', size(numericalMixingTracersHorAdvTend, 1)
-         !  print *, '  dim 2 (should be nVertLevels): ', size(numericalMixingTracersHorAdvTend, 2)
-         !  print *, '  dim 3 (should be nCells): ', size(numericalMixingTracersHorAdvTend, 3)
-          ! Temp 
           block => block%next
        end do
-
-      !  deallocate(vertDiffMid)
-      !  deallocate(numericalMixingTracersHorAdvTendDt)
-      !  deallocate(numericalMixingTracersVerAdvTendDt)
  
     end subroutine ocn_compute_discrete_variance_decay!}}}
 

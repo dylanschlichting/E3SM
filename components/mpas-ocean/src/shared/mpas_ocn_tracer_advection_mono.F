@@ -556,11 +556,6 @@ module ocn_tracer_advection_mono
         end do ! iCell loop
 
         if (computeNumericalMixingTracers) then
-        !    print *, 'iTracer = ', iTracer
-        !    print *, 'Shape of numericalMixingTracers:', SHAPE(numericalMixingTracersHorAdvTend)   
-        !    print *, 'nCellsOwned = ', nCellsOwned
-        !    print *, 'nCells = ', nCells
-        !    print *, 'Shape of workTend: ', SHAPE(workTend)
            !$omp parallel
            !$omp do schedule(runtime) private(k)
            do iCell = 1, nCellsOwned
