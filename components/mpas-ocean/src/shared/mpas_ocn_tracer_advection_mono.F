@@ -555,23 +555,19 @@ module ocn_tracer_advection_mono
 
         end do ! iCell loop
 
-        if (computeNumericalMixingTracers) then
-           !$omp parallel
-           !$omp do schedule(runtime) private(k)
-           do iCell = 1, nCellsOwned
-             do k = 1, maxLevelCell(iCell)
-                 numericalMixingTracersHorAdvTend(iTracer,k,iCell) = workTend(k,iCell)
-                !  print *, 'numericalMixingTracersHorAdvTend = ', numericalMixingTracersHorAdvTend(iTracer,k,iCell)
-             end do
-           end do ! iCell loop
-           !$omp end do
-           !$omp end parallel
-        end if
-
 #ifndef MPAS_OPENACC
         !$omp end do
         !$omp end parallel
 #endif
+        ! Calculate the numerical mixing horizontal advection tendency
+        if (computeNumericalMixingTracers) then
+           do iCell = 1, nCellsOwned
+             do k = 1, maxLevelCell(iCell)
+                 numericalMixingTracersHorAdvTend(iTracer,k,iCell) = workTend(k,iCell)
+                !  print *, 'numericalMixingTracersHorAdvTend = ', numericalMixingTracersHorAdvTend(iTracer,k,iCell)
+             end do ! k loop
+           end do ! iCell loop
+        end if
      
 #ifdef _ADV_TIMERS
         call mpas_timer_stop('flux accumulate')
@@ -891,14 +887,12 @@ module ocn_tracer_advection_mono
         !$omp end do
         !$omp end parallel
 #endif
-
+        ! Calculate the numerical mixing vertical advection tendency
         if (computeNumericalMixingTracers) then
-           !$omp parallel
-           !$omp do schedule(runtime) private(k)
            do iCell = 1, nCellsOwned
              do k = 1, maxLevelCell(iCell)
                  numericalMixingTracersVerAdvTend(iTracer,k,iCell) = workTend(k,iCell)
-             end do
+             end do ! k loop
            end do ! iCell loop
         end if
 
