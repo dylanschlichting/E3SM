@@ -29,18 +29,18 @@
 </packages>
 <var_struct name="discreteVarianceDecayAM" time_levs="1" packages="discreteVarianceDecayAMPKG">
 	<var_array name="chiSpurHorTracerBR08" type="real" dimensions="nVertLevels nCells Time">
-		<var name="chiSpurHorTempBR08" array_group="chiSpurHorzTracerBR08" units="(deg C)^2 s^-1" name_in_code="chiSpurHorzTempBR08"
+		<var name="chiSpurHorTempBR08" array_group="chiSpurHorTracerBR08" units="(deg C)^2 s^-1" name_in_code="chiSpurHorzTempBR08"
 			description="Numerical temperature mixing due to horizontal advection from Burchard and Rennau method."
 		/>         
-		<var name="chiSpurHorSaltBR08" array_group="chiSpurHorzTracerBR08" units="(g kg^-1)^2 s^-1" name_in_code="chiSpurHorzSaltBR08"
+		<var name="chiSpurHorSaltBR08" array_group="chiSpurHorTracerBR08" units="(g kg^-1)^2 s^-1" name_in_code="chiSpurHorzSaltBR08"
 			description="Numerical salinity mixing due to horizontal advection from Burchard and Rennau method."
 		/>
 	</var_array>
 	<var_array name="chiSpurVerTracerBR08" type="real" dimensions="nVertLevels nCells Time">
-	    <var name="chiSpurVertTempBR08" array_group="chiSpurVertTracerBR08" units="(deg C)^2 s^-1" name_in_code="chiSpurVertTempBR08"
+	    <var name="chiSpurVerTempBR08" array_group="chiSpurVerTracerBR08" units="(deg C)^2 s^-1" name_in_code="chiSpurVertTempBR08"
 			description="Numerical temperature mixing due to vertical advection from Burchard and Rennau method."
      	/>         
-		<var name="chiSpurVerSaltBR08" array_group="chiSpurVertTracerBR08" units="(g kg^-1)^2 s^-1" name_in_code="chiSpurVertSaltBR08"
+		<var name="chiSpurVerSaltBR08" array_group="chiSpurVerTracerBR08" units="(g kg^-1)^2 s^-1" name_in_code="chiSpurVertSaltBR08"
 			description="Numerical salinity mixing due to vertical advection from Burchard and Rennau method."
 	    />
 	</var_array>
@@ -63,8 +63,8 @@
 			clobber_mode="truncate"
 			runtime_format="single_file">
 		<var name="xtime"/>
-		<var_array name="chiSpurHorzTracerBR08"/>
-		<var_array name="chiSpurVertTracerBR08"/>
+		<var_array name="chiSpurHorTracerBR08"/>
+		<var_array name="chiSpurVerTracerBR08"/>
 		<var name="chiPhyVerSalt"/>
 		<var name="chiPhyVerTemp"/>
 	</stream>
