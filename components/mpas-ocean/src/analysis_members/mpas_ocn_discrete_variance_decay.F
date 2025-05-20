@@ -215,10 +215,9 @@ module ocn_discrete_variance_decay
  
        dminfo = domain%dminfo
        ! Convert dt to real
-      !  call mpas_set_timeInterval(timeStepESMF, timeString=config_dt, ierr=err)
-      !  call mpas_get_timeInterval(timeStepESMF, dt=dt)
-       dt = 3600.0_RKIND
-      !  print *, 'dt = ', dt
+       call mpas_pool_get_config(domain%configs, 'config_dt', config_dt)
+       call mpas_set_timeInterval(timeStepESMF, timeString=config_dt, ierr=err)
+       call mpas_get_timeInterval(timeStepESMF, dt=dt)
  
        block => domain%blocklist
        do while (associated(block))
