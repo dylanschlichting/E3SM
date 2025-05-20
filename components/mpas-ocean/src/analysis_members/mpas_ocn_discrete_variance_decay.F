@@ -1,4 +1,4 @@
-! Copyright (c) 2013,  Los Alamos National Security, LLC (LANS)
+! Copyright (c) 2025,  Los Alamos National Security, LLC (LANS)
 ! and the University Corporation for Atmospheric Research (UCAR).
 !
 ! Unless noted otherwise source code is licensed under the BSD license.
@@ -17,7 +17,8 @@
 !> \details
 !>   Computes destruction of tracer variance via the numerical implementation
 !>   of the 3D transport equation 
-!>   Returns a nVertLevels x nCells x Time array for each tracer. 
+!>   Returns a nVertLevelsP1 x nCells x Time array for physical mixing.
+!>   Returns a nVertLevels x nCells x Time array for numerical mixing. 
 !> 
 !>   Details described in Burchard & Rennau (2008) Ocean Modelling
 !>   https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2012JC008108
@@ -27,10 +28,13 @@
 !>   chi_phy_horz = 2 * [ \kappa_h * (\partial_x c)**2 + (\partial_y c)**2 ] 
 !>   chi_num_br08 = [ A{c**2} - (A{c})**2 ] / dt_baroclinic 
 !>   chi_num_k14 = 
-!>   Vertical gradients modified from Eliassen Palm analysis member,
+!>   Vertical gradients using the approach in subroutine ocn_GM_compute_Bolus_velocity
 !>   Vertical diffusion coefficient imported from vertical mixing 
+!>   Numerical and physical located are not co-located on the vertical grid.
+!>   Numerical mixing is on the mid-layer points, physical mixing is on cell tops
+!>   because the vertical diffusivity is defined at the cell top.
 !>   To do: Add support for explict horizontal mixing, which is not used 
-!>   by default. Add GM + Redi support. Add K14 method
+!>   by default. Add GM + Redi support, much more complex. Add K14 method
 !-----------------------------------------------------------------------
 
 module ocn_discrete_variance_decay
@@ -65,8 +69,7 @@ module ocn_discrete_variance_decay
     public :: ocn_init_discrete_variance_decay, &
               ocn_compute_discrete_variance_decay, &
               ocn_restart_discrete_variance_decay, &
-              ocn_finalize_discrete_variance_decay, & 
-              computeVerticalDerivative
+              ocn_finalize_discrete_variance_decay
  
     !--------------------------------------------------------------------
     !
@@ -186,21 +189,21 @@ module ocn_discrete_variance_decay
        real(kind=RKIND), dimension(:,:,:), pointer :: chiSpurVerTracerBR08
 
        ! Vert temp & salt grad, vert diffusivity
-       real(kind=RKIND), dimension(:,:), pointer :: dTdz, dsdz, vertDiffTopOfCell
+       real(kind=RKIND), dimension(:,:), pointer ::  vertDiffTopOfCell
+       real(kind=RKIND), dimension(:,:), allocatable :: dTdzTop, dSdzTop, dzTop
        ! Vertical destruction of salt and temp variance
        real(kind=RKIND), dimension(:,:), pointer :: chiPhyVerSalt, chiPhyVerTemp
        real(kind=RKIND), dimension(:), pointer :: areaCell, bottomDepth
        real(kind=RKIND), pointer :: config_cvmix_background_diffusion
 
        real(kind=RKIND) :: backgroundDiff
-       ! Temporary arrays for intermediate cals
-       real(kind=RKIND), dimension(:,:), allocatable :: tmp2D, sal2D, Aht2, Ahs2, &
+       ! Temporary arrays for intermediate calcs
+       real(kind=RKIND), dimension(:,:), allocatable :: Aht2, Ahs2, &
                                                         Aht_2, Ahs_2, Avt2, Avs2, &
                                                         Avt_2, Avs_2
-       ! Interpolated diffusivity @ mid layer of cell
-       real(kind=RKIND), allocatable :: vertDiffMid(:,:)
+       real (kind=RKIND), dimension(:,:), pointer :: layerThickness
  
-       integer, dimension(:), pointer :: maxLevelCell, maxLevelEdgeTop, maxLevelVertexBot
+       integer, dimension(:), pointer :: minLevelCell, maxLevelCell, maxLevelEdgeTop, maxLevelVertexBot
        integer, pointer :: index_temperature, index_salinity, & 
        nVertLevels, nVertLevelsP1, nCells, nEdgesSolve, nVerticesSolve
        integer :: iTracer, k, iCell
@@ -235,11 +238,12 @@ module ocn_discrete_variance_decay
           call mpas_pool_get_dimension(tracersPool, 'index_temperature', index_temperature)
           call mpas_pool_get_dimension(tracersPool, 'index_salinity', index_salinity)
 
+          call mpas_pool_get_array(meshPool, 'minLevelCell', minLevelCell)
           call mpas_pool_get_array(meshPool, 'maxLevelCell', maxLevelCell)
-          call mpas_pool_get_array(meshPool, 'maxLevelEdgeTop', maxLevelEdgeTop)
-          call mpas_pool_get_array(meshPool, 'maxLevelVertexBot', maxLevelVertexBot)
           call mpas_pool_get_array(meshPool, 'bottomDepth', bottomDepth)
           call mpas_pool_get_array(meshPool, 'areaCell', areaCell)
+
+          call mpas_pool_get_array(statePool, 'layerThickness', layerThickness, timeLevel)
 
           call mpas_pool_get_array(diagnosticsPool, 'vertDiffTopOfCell', vertDiffTopOfCell)
           call mpas_pool_get_array(diagnosticsPool, 'numericalMixingTracersHorAdvTend', numericalMixingTracersHorAdvTend)
@@ -249,48 +253,52 @@ module ocn_discrete_variance_decay
           call mpas_pool_get_array(discreteVarianceDecayAMPool, 'chiPhyVerSalt', chiPhyVerSalt) 
           call mpas_pool_get_array(discreteVarianceDecayAMPool, 'chiPhyVerTemp', chiPhyVerTemp)
 
-          ! Interpolate vertical diffusivity from top of cell to middle of layer. Since vertDiffTopofCell
-          ! has vshape nVertLevelsP1, vertDiffMid should have shape nVertLevels
-          allocate(vertDiffMid(nVertLevels, nCells))
+
+          ! Calculate vertical temperature and salinity gradients. Loop over layers 2 to n-1.
+          ! Modified from components/mpas-ocean/src/shared/mpaso_ocn_gm.F
+          allocate(dTdzTop(nVertLevels + 1, nCells))
+          allocate(dSdzTop(nVertLevels + 1, nCells))
+          allocate(dzTop(nVertLevels + 1, nCells))  
           do iCell = 1, nCells
-             do k = 1, nVertLevels
-                 vertDiffMid(k,iCell) = ( vertDiffTopOfCell(k,iCell) + vertDiffTopOfCell(k+1,iCell)) / 2.0d0
-             end do
+             print *, 'minlevelCell+1',minLevelCell(iCell)+1
+             print *, 'maxlevelCell',minLevelCell(iCell)
+            do k = minLevelCell(iCell)+1, maxLevelCell(iCell)
+               dzTop(k,iCell) = 0.5_RKIND*(layerThickness(k - 1, iCell) + layerThickness(k, iCell))
+               dTdzTop(k,iCell) = (activeTracers(index_temperature, k - 1, iCell) &
+                           - activeTracers(index_temperature, k, iCell)) &
+                           /dzTop(k,iCell)
+               dSdzTop(k,iCell) = (activeTracers(index_salinity, k - 1, iCell) &
+                           - activeTracers(index_salinity, k, iCell)) &
+                           /dzTop(k,iCell)
+            end do
+            dzTop(1:minLevelCell(iCell),iCell) = 0.0_RKIND
+            dTdzTop(1:minLevelCell(iCell),iCell) = 0.0_RKIND
+            dSdzTop(1:minLevelCell(iCell),iCell) = 0.0_RKIND
+            dzTop(maxLevelCell(iCell) + 1,iCell) = 0.0_RKIND
+            dTdzTop(maxLevelCell(iCell) + 1,iCell) = 0.0_RKIND
+            dSdzTop(maxLevelCell(iCell) + 1,iCell) = 0.0_RKIND
           end do
 
-          ! Computer vertical temperature gradient
-          ! Initialize temp, salt, and their derivatives
-          allocate(tmp2D(nVertLevels,nCells))
-          allocate(dTdz(nVertLevels,nCells))
-          tmp2D = activeTracers(index_temperature, :, :)
-          call computeVerticalDerivative(nCells, nVertLevels, zMid, & 
-                                         tmp2D, dTdz)
-
-          allocate(sal2D(nVertLevels,nCells))
-          allocate(dsdz(nVertLevels,nCells))
-          sal2D = activeTracers(index_salinity, :, :)
-          ! Computer vertical salinity gradient
-          call computeVerticalDerivative(nCells, nVertLevels, zMid, & 
-                                         sal2D, dsdz)
-
-          ! Local estimates of vertical physical mixing 
-          do iCell = 1, nCells
-              do k = 1, maxLevelCell(iCell)
-                  ! Subtract background tracer diffusion if turned on  
-                  if (config_cvmix_background_diffusion_enable) then
-                     backgroundDiff = config_cvmix_background_diffusion 
-                  else 
-                     backgroundDiff = 0.0_RKIND
-                  end if 
+         ! Local estimates of vertical physical mixing. 
+         ! Subtract background tracer diffusivity if turned on  
+         if (config_cvmix_background_diffusion_enable) then
+            backgroundDiff = config_cvmix_background_diffusion 
+         else 
+            backgroundDiff = 0.0_RKIND
+         end if 
+         
+         do iCell = 1, nCells
+              do k = minLevelCell(iCell), maxLevelCell(iCell)
                   ! Temperature 
-                  chiPhyVerTemp(k,iCell) = 2.0_RKIND * (vertDiffMid(k,iCell)-backgroundDiff) & 
-                  * ( (dTdz(k,iCell) * dTdz(k,iCell)) )
+                  chiPhyVerTemp(k,iCell) = 2.0_RKIND * (vertDiffTopOfCell(k,iCell)-backgroundDiff) & 
+                  * ( (dTdzTop(k,iCell) * dTdzTop(k,iCell)) )
                   ! Salinity 
-                  chiPhyVerSalt(k,iCell) = 2.0_RKIND * (vertDiffMid(k,iCell)-backgroundDiff) & 
-                  * ( (dsdz(k,iCell) * dsdz(k,iCell)) )
+                  chiPhyVerSalt(k,iCell) = 2.0_RKIND * (vertDiffTopOfCell(k,iCell)-backgroundDiff) & 
+                  * ( (dSdzTop(k,iCell) * dSdzTop(k,iCell)) )
               end do
           end do
           
+          ! To do ----
           ! Local estimates of horizontal physical mixing due to laplacian diffusion 
           ! Local estimates of horizontal physical mixing due to biharmonic diffusion 
           ! Local estimates of physical mixing due to redi diffusion 
@@ -334,67 +342,6 @@ module ocn_discrete_variance_decay
        end do
  
     end subroutine ocn_compute_discrete_variance_decay!}}}
-
- !***********************************************************************
- !
- !  routine computeVerticalDerivative
- !
- !> \brief   Computes vertical gradient 
- !> \author  Dylan Schlichting
- !> \date    April-May 2025
- !> \details
- !>  Computes the vertical gradient of a scalar field. 
- !>  Modified from mpas_ocn_eliassen_palm.F with help from ChatGPT
- !>  so that firstLayer is always 1 and the last layer is the total 
- !>  number of vertical layers. Uses a forward difference in physical space
- !>  for the first and last layers, and a centered difference in the middle 
- !>  middle layers.
- !-----------------------------------------------------------------------
-
-    subroutine computeVerticalDerivative(nCells, nVertLevels, heightMid, field, derivativeField)
-      integer, intent(in) :: nCells, nVertLevels
-      real(kind=RKIND), dimension(:,:), intent(in) :: heightMid
-      real(kind=RKIND), dimension(:,:), intent(in) :: field
-      real(kind=RKIND), dimension(:,:), intent(out) :: derivativeField
-      ! real(kind=RKIND), dimension(:,:), allocatable, intent(out) :: derivativeField
-
-      integer :: iCell, kLayer
-      integer :: firstLayer, lastLayer
-
-      real(kind=RKIND) :: wrkAbove, wrkBelow, dz
-
-      ! Set firstLayer to always be 1, and lastLayer to always be nVertLevels
-      firstLayer = 1
-      lastLayer = nVertLevels  ! Treat lastLayer as constant across all cells
-  
-      ! Initialize the derivativeField, note this is allocated before call time
-      ! otherwise you well get a memory seg fault
-      derivativeField = 0.0_RKIND
-  
-      do iCell = 1, nCells
-          ! Calculate derivative at the first layer
-          wrkAbove = field(firstLayer, iCell)
-          wrkBelow = field(firstLayer + 1, iCell)
-          dz = heightMid(firstLayer, iCell) - heightMid(firstLayer + 1, iCell)
-          derivativeField(firstLayer, iCell) = (wrkAbove - wrkBelow) / dz  
-
-          ! Loop over intermediate layers
-          do kLayer = 2, lastLayer - 1
-              wrkAbove = field(kLayer - 1, iCell)
-              wrkBelow = field(kLayer + 1, iCell)
-              dz = heightMid(kLayer - 1, iCell) - heightMid(kLayer + 1, iCell)
-              derivativeField(kLayer, iCell) = (wrkAbove - wrkBelow) / dz
-          end do
-  
-          ! Calculate derivative at the last layer
-          wrkAbove = field(lastLayer - 1, iCell)
-          wrkBelow = field(lastLayer, iCell)
-          dz = heightMid(lastLayer - 1, iCell) - heightMid(lastLayer, iCell)
-  
-          derivativeField(lastLayer, iCell) = (wrkAbove - wrkBelow) / dz
-      end do
-  
-  end subroutine computeVerticalDerivative
  
  !***********************************************************************
  !
