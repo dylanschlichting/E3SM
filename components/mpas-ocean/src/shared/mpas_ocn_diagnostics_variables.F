@@ -1385,6 +1385,10 @@ contains
                  activeTracerHorizontalAdvectionTendency, &
                  activeTracerHorizontalAdvectionEdgeFlux)
       end if
+      if ( config_use_numericalMixingTracers ) then
+         nullify(numericalMixingTracersHorAdvTend, &
+                 numericalMixingTracersVerAdvTend)
+      end if
       if ( config_use_activeTracers_surface_restoring ) then
          nullify(salinitySurfaceRestoringTendency)
       end if
