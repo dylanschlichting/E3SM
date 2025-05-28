@@ -562,7 +562,7 @@ module ocn_tracer_advection_mono
         ! Calculate the numerical mixing horizontal advection tendency
         if (computeNumericalMixingTracers) then
            do iCell = 1, nCellsOwned
-             do k = 1, maxLevelCell(iCell)
+             do k = minLevelCell(iCell), maxLevelCell(iCell)
                  numericalMixingTracersHorAdvTend(iTracer,k,iCell) = workTend(k,iCell)
                 !  print *, 'numericalMixingTracersHorAdvTend = ', numericalMixingTracersHorAdvTend(iTracer,k,iCell)
              end do ! k loop
@@ -890,7 +890,7 @@ module ocn_tracer_advection_mono
         ! Calculate the numerical mixing vertical advection tendency
         if (computeNumericalMixingTracers) then
            do iCell = 1, nCellsOwned
-             do k = 1, maxLevelCell(iCell)
+             do k = minLevelCell(iCell), maxLevelCell(iCell)
                  numericalMixingTracersVerAdvTend(iTracer,k,iCell) = workTend(k,iCell)
              end do ! k loop
            end do ! iCell loop
