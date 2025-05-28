@@ -2361,18 +2361,29 @@ module ocn_time_integration_split_ab2
             allocate(numericalMixingTracersHorAdvTend(dims(1), dims(2), dims(3)))
             allocate(numericalMixingTracersVerAdvTend(dims(1), dims(2), dims(3)))
             
+            ! Divide by layer thickness to get the tendency per unit thickness.
             if ( config_use_numericalMixingTracers ) then
                !$omp parallel
                !$omp do schedule(runtime) private(k)
                do iCell = 1, nCells
-                  do k= 1, maxLevelCell(iCell)
-                     numericalMixingTracersHorAdvTend(:,k,iCell) = numericalMixingTracersHorAdvTend(:,k,iCell) / layerThicknessNew(k,iCell)
-                     numericalMixingTracersVerAdvTend(:,k,iCell)  = numericalMixingTracersVerAdvTend(:,k,iCell) / layerThicknessNew(k,iCell)
+                  do k = minLevelCell(iCell), maxLevelCell(iCell)
+                     numericalMixingTracersHorAdvTend(1,k,iCell) = numericalMixingTracersHorAdvTend(1,k,iCell) / layerThicknessNew(k,iCell)
+                     numericalMixingTracersHorAdvTend(2,k,iCell) = numericalMixingTracersHorAdvTend(2,k,iCell) / layerThicknessNew(k,iCell)
+                     numericalMixingTracersHorAdvTend(3,k,iCell) = numericalMixingTracersHorAdvTend(3,k,iCell) / (layerThicknessNew(k,iCell)
+                     numericalMixingTracersHorAdvTend(4,k,iCell) = numericalMixingTracersHorAdvTend(4,k,iCell) / (layerThicknessNew(k,iCell)
+
+                     numericalMixingTracersVerAdvTend(1,k,iCell) = numericalMixingTracersVerAdvTend(1,k,iCell) / layerThicknessNew(k,iCell)
+                     numericalMixingTracersVerAdvTend(2,k,iCell) = numericalMixingTracersVerAdvTend(2,k,iCell) / layerThicknessNew(k,iCell)
+                     numericalMixingTracersVerAdvTend(3,k,iCell) = numericalMixingTracersVerAdvTend(3,k,iCell) / (layerThicknessNew(k,iCell)
+                     numericalMixingTracersVerAdvTend(4,k,iCell) = numericalMixingTracersVerAdvTend(4,k,iCell) / (layerThicknessNew(k,iCell)
                   end do
                end do
                !$omp end do
                !$omp end parallel
             endif
+
+            deallocate(numericalMixingTracersHorAdvTend)
+            deallocate(numericalMixingTracersVerAdvTend)
 
             call mpas_pool_begin_iteration(tracersPool)
             do while (mpas_pool_get_next_member(tracersPool, &
@@ -2872,29 +2883,6 @@ module ocn_time_integration_split_ab2
          !$omp end parallel
 #endif
       end if
-
-      ! Reset numericalMixingTracers to the activeTracer values? 
-      ! if ( config_use_numericalMixingTracers ) then
-      !    call mpas_pool_begin_iteration(tracersPool)
-      !    do while ( mpas_pool_get_next_member(tracersPool, groupItr) )
-      !       if ( groupItr % memberType == MPAS_POOL_FIELD ) then
-      !             ! Reset numericalMixingTracers to original value
-      !             if ( trim(groupItr % memberName) == 'numericalMixingTracers' ) then
-      !             call mpas_pool_get_array(tracersPool, groupItr % memberName, tracersGroupCur, 1)
-      !             call mpas_pool_get_array(tracersPool, groupItr % memberName, tracersGroupNew, 2)
-      !                !$omp parallel
-      !                !$omp do schedule(runtime) private(k)
-      !                do iCell = 1, nCells
-      !                   do k = 1, maxLevelCell(iCell)
-      !                      tracersGroupNew(:,k,iCell) = tracersGroupCur(:,k,iCell)
-      !                   end do
-      !                end do
-      !                !$omp end do
-      !                !$omp end parallel
-      !             end if
-      !       end if
-      !    end do
-      ! end if
 
       call ocn_diagnostic_solve(dt, statePool, forcingPool, meshPool, verticalMeshPool, &
                                 scratchPool, tracersPool, 2)
