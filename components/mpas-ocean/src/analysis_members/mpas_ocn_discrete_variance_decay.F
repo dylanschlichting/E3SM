@@ -338,6 +338,12 @@ module ocn_discrete_variance_decay
           chiSpurVerTracerBR08(1,:,:) = (Avt_2-Avt2)/dt
           chiSpurVerTracerBR08(2,:,:) = (Avs_2-Avs2)/dt
 
+          ! Deallocate intermediate arrays
+          deallocate(dTdzTop, dSdzTop, dzTop)
+          deallocate(Aht2, Ahs2, Aht_2, Ahs_2)
+          deallocate(Avt2, Avs2, Avt_2, Avs_2)
+          deallocate(At2_tot, As2_tot, At_2_tot, As_2_tot)
+
           block => block%next
        end do
  
