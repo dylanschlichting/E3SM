@@ -239,7 +239,8 @@ module ocn_time_integration_split
 
       integer :: &
          startIndex, endIndex, &! start, end index for tracer groups
-         indexSalinity          ! tracer index for salinity
+         indexSalinity, &          ! tracer index for salinity
+         indexTemperature          ! tracer index for Temperature
 
       integer :: iTracer, numTracers, numActiveTracers
 
@@ -280,11 +281,16 @@ module ocn_time_integration_split
 
       real (kind=RKIND), dimension(:,:,:), pointer :: activeTracersNew
 
+      real (kind=RKIND), dimension(:,:,:), pointer :: & 
+            numericalMixingTracers
+
       real (kind=RKIND), pointer :: forcingTimeIncrement
 
       ! Remap variables
       real (kind=RKIND), dimension(:,:), pointer :: &
          layerThicknessLagNew
+
+      integer, dimension(3) :: dims
 
       ! These are public variables used from the diagnostics module
       ! indexSurfaceVelocityZonal, indexSurfaceVelocityMeridional
@@ -378,6 +384,8 @@ module ocn_time_integration_split
 
       call mpas_pool_get_dimension_scalar(tracersPool, 'index_salinity', &
                                                         indexSalinity)
+      call mpas_pool_get_dimension_scalar(tracersPool, 'index_temperature', &
+                                                        indexTemperature)
 
       !*** Retrieve tendency variables
 
@@ -397,6 +405,18 @@ module ocn_time_integration_split
                                           lowFreqDivergenceTend)
 
       call mpas_pool_get_array(tracersPool, 'activeTracers', activeTracersNew, 2)
+
+      call mpas_pool_get_array(tracersPool, 'numericalMixingTracers', numericalMixingTracers, 1)
+
+      ! Set the numerical mixing tracers = to the active tracers. Order is temp, salt, temp**2,salt**2
+      dims = shape(activeTracersNew)
+
+      if ( config_use_numericalMixingTracers ) then
+         numericalMixingTracers(1,:,:) = activeTracersNew(indexTemperature,:,:)
+         numericalMixingTracers(2,:,:) = activeTracersNew(indexSalinity,:,:)
+         numericalMixingTracers(3,:,:) = activeTracersNew(indexTemperature,:,:)**2
+         numericalMixingTracers(4,:,:) = activeTracersNew(indexSalinity,:,:)**2
+      end if 
 
       allocate(baroclinicThickness(nEdgesAll+1))
 

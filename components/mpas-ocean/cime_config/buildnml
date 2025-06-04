@@ -632,8 +632,6 @@ def buildnml(case, caseroot, compname):
             lines.append('')
             lines.append('    <var_array name="activeTracerHorizontalAdvectionTendency"/>')
             lines.append('    <var_array name="activeTracerVerticalAdvectionTendency"/>')
-            lines.append('    <var_array name="numericalMixingTracersHorAdvTend"/>')
-            lines.append('    <var_array name="numericalMixingTracersVerAdvTend"/>')
             lines.append('    <var_array name="activeTracerVertMixTendency"/>')
             lines.append('    <var_array name="activeTracerSurfaceFluxTendency"/>')
             lines.append('    <var_array name="temperatureShortWaveTendency"/>')

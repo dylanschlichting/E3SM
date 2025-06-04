@@ -173,8 +173,6 @@ module ocn_diagnostics_variables
       activeTracerHorizontalAdvectionEdgeFlux, &
       activeTracerVerticalAdvectionTopFlux,    &
       activeTracerVertMixTendency,             &
-      numericalMixingTracersHorAdvTend,        &
-      numericalMixingTracersVerAdvTend
 
    real (kind=RKIND), pointer :: daysSinceStartOfSim
    real (kind=RKIND), pointer :: Time
@@ -353,11 +351,6 @@ contains
                   'salinitySurfaceRestoringTendency', &
                    salinitySurfaceRestoringTendency)
       end if
-
-      if ( config_use_numericalMixingTracers ) then
-         call mpas_pool_get_array(diagnosticsPool,'numericalMixingTracersHorAdvTend',numericalMixingTracersHorAdvTend)
-         call mpas_pool_get_array(diagnosticsPool,'numericalMixingTracersVerAdvTend',numericalMixingTracersVerAdvTend)
-      endif
 
       ! Retrieve pointers for configurations where land_ice_flux_mode is enabled
       if ( trim(config_land_ice_flux_mode) /= 'off' ) then
@@ -910,12 +903,6 @@ contains
          !$acc                   activeTracerHorizontalAdvectionEdgeFlux  &
          !$acc                   )
       end if
-      if ( config_use_numericalMixingTracers ) then
-         !$acc enter data create(                                         &
-         !$acc                   numericalMixingTracersHorAdvTend,   &
-         !$acc                   numericalMixingTracersVerAdvTend, &
-         !$acc                   )
-      end if
       if ( config_use_activeTracers_surface_restoring ) then
          !$acc enter data create(                                  &
          !$acc                   salinitySurfaceRestoringTendency  &
@@ -1176,12 +1163,6 @@ contains
          !$acc                   activeTracerHorizontalAdvectionEdgeFlux  &
          !$acc                   )
       end if
-         if ( config_use_numericalMixingTracers ) then
-         !$acc exit data delete(                                   &
-         !$acc                   numericalMixingTracersHorAdvTend, &
-         !$acc                   numericalMixingTracersVerAdvTend, &
-         !$acc                   )
-      end if
       if ( config_use_activeTracers_surface_restoring ) then
          !$acc exit data delete(                                   &
          !$acc                   salinitySurfaceRestoringTendency  &
@@ -1384,10 +1365,6 @@ contains
                  activeTracerVerticalAdvectionTendency,   &
                  activeTracerHorizontalAdvectionTendency, &
                  activeTracerHorizontalAdvectionEdgeFlux)
-      end if
-      if ( config_use_numericalMixingTracers ) then
-         nullify(numericalMixingTracersHorAdvTend, &
-                 numericalMixingTracersVerAdvTend)
       end if
       if ( config_use_activeTracers_surface_restoring ) then
          nullify(salinitySurfaceRestoringTendency)
