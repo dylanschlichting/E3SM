@@ -878,15 +878,6 @@ module ocn_tracer_advection_mono
         !$omp end do
         !$omp end parallel
 #endif
-        ! Calculate the numerical mixing vertical advection tendency
-        if (computeNumericalMixingTracers) then
-           do iCell = 1, nCellsOwned
-             do k = minLevelCell(iCell), maxLevelCell(iCell)
-                 numericalMixingTracersVerAdvTend(iTracer,k,iCell) = workTend(k,iCell)
-             end do ! k loop
-           end do ! iCell loop
-        end if
-
         ! Compute advection diagnostics and monotonicity checks if requested
 #ifdef _ADV_TIMERS
         call mpas_timer_stop('flux accumulate')

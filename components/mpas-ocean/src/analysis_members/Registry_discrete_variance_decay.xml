@@ -28,27 +28,19 @@
 	<package name="discreteVarianceDecayAMPKG" description="This package includes variables required for the template analysis member."/>
 </packages>
 <var_struct name="discreteVarianceDecayAM" time_levs="1" packages="discreteVarianceDecayAMPKG">
-	<var_array name="chiSpurHorTracerBR08" type="real" dimensions="nVertLevels nCells Time">
-		<var name="chiSpurHorTempBR08" array_group="chiSpurHorTracerBR08" units="(deg C)^2 s^-1" name_in_code="chiSpurHorzTempBR08"
-			description="Numerical temperature mixing due to horizontal advection from Burchard and Rennau method."
-		/>         
-		<var name="chiSpurHorSaltBR08" array_group="chiSpurHorTracerBR08" units="(g kg^-1)^2 s^-1" name_in_code="chiSpurHorzSaltBR08"
-			description="Numerical salinity mixing due to horizontal advection from Burchard and Rennau method."
-		/>
-	</var_array>
-	<var_array name="chiSpurVerTracerBR08" type="real" dimensions="nVertLevels nCells Time">
-	    <var name="chiSpurVerTempBR08" array_group="chiSpurVerTracerBR08" units="(deg C)^2 s^-1" name_in_code="chiSpurVertTempBR08"
-			description="Numerical temperature mixing due to vertical advection from Burchard and Rennau method."
+	<var_array name="chiSpurTracerBR08" type="real" dimensions="nVertLevels nCells Time">
+	    <var name="chiSpurTempBR08" array_group="chiSpurTracerBR08" units="(deg C)^2 s^-1"
+			description="Numerical temperature mixing due to total advection from Burchard and Rennau method."
      	/>         
-		<var name="chiSpurVerSaltBR08" array_group="chiSpurVerTracerBR08" units="(g kg^-1)^2 s^-1" name_in_code="chiSpurVertSaltBR08"
-			description="Numerical salinity mixing due to vertical advection from Burchard and Rennau method."
+		<var name="chiSpurSaltBR08" array_group="chiSpurTracerBR08" units="(g kg^-1)^2 s^-1"
+			description="Numerical salinity mixing due to total advection from Burchard and Rennau method."
 	    />
 	</var_array>
-		<var name="chiPhyVerSalt" type="real" dimensions="nVertLevels nCells Time" units="(g kg^-1)^2 s^-1"
-		description="Destruction of parameterized vertical salinity variance"
+		<var name="chiPhyVerSalt" type="real" dimensions="nVertLevelsP1 nCells Time" units="(g kg^-1)^2 s^-1"
+		description="Destruction of explicit vertical salinity variance"
 		/>
-		<var name="chiPhyVerTemp" type="real" dimensions="nVertLevels nCells Time" units="(deg C)^2 s^-1"
-		description="Destruction of parameterized vertical temperature variance"
+		<var name="chiPhyVerTemp" type="real" dimensions="nVertLevelsP1 nCells Time" units="(deg C)^2 s^-1"
+		description="Destruction of explicit vertical temperature variance"
 		/>
 </var_struct>
 <streams>
@@ -63,8 +55,7 @@
 			clobber_mode="truncate"
 			runtime_format="single_file">
 		<var name="xtime"/>
-		<var_array name="chiSpurHorTracerBR08"/>
-		<var_array name="chiSpurVerTracerBR08"/>
+		<var_array name="chiSpurTracerBR08"/>
 		<var name="chiPhyVerSalt"/>
 		<var name="chiPhyVerTemp"/>
 	</stream>
