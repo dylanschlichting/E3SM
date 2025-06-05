@@ -1502,7 +1502,11 @@ module mpas_timekeeping
          if (size(subStrings) == 3) then
             read(subStrings(1),*) hour
             read(subStrings(2),*) min
-            read(subStrings(3),*) sec
+            if (trim(subStrings(3))=='-') then
+               sec = 0_I8KIND
+            else
+               read(subStrings(3),*) sec
+            end if
             deallocate(subStrings)
          else if (size(subStrings) == 2) then
             hour = 0
