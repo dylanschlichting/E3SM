@@ -377,37 +377,52 @@ contains
     call MPAS_pool_get_array(forcingPool, "atmosphericPressure", atmosphericPressure)
     call mpas_pool_get_array(forcingPool, 'forcingTimeIncrement', forcingTimeIncrement)
 
-    rhoAir = 1.225_RKIND
-    windStressCoefficientLimit = 0.0035_RKIND
+    if (config_use_numericalMixingTracers) then
+        ! Modifications by D.S., 06/09/2025. No ramp, so forcing starts immediately. 
+        ! Wind stress has the form tau_x = 0.1*sin(0.9*f*t), where f is coriolis.
+        ramp = 0.0_RKIND
+        !$omp parallel
+        !$omp do schedule(runtime)
+        do iCell = 1, nCells
+              windStressZonal(iCell) =  0.1_RKIND*SIN(0.9_RKIND*1.0E-04_RKIND*daysSinceStartOfSim*86400_RKIND)
+              windStressMeridional(iCell) = 0.0_RKIND
+              atmosPressure(iCell) = 0.0_RKIND
+              atmosphericPressure(iCell) = ((1.0_RKIND-ramp)*atm_ref_pressure + ramp*atmosPressure(iCell)) - atm_ref_pressure
+        enddo
+        !$omp end do
+        !$omp end parallel
+     else
+          rhoAir = 1.225_RKIND
+          windStressCoefficientLimit = 0.0035_RKIND
 
-    if (daysSinceStartOfSim >= config_time_varying_atmospheric_forcing_ramp_delay) then
-      t = (daysSinceStartOfSim*86400_RKIND + forcingTimeIncrement)/86400.0_RKIND
-      ramp = tanh((2.0_RKIND*(t-config_time_varying_atmospheric_forcing_ramp_delay)) &
-                              /config_time_varying_atmospheric_forcing_ramp)
-    else
-      ramp = 0.0_RKIND
-    end if
+          if (daysSinceStartOfSim >= config_time_varying_atmospheric_forcing_ramp_delay) then
+               t = (daysSinceStartOfSim*86400_RKIND + forcingTimeIncrement)/86400.0_RKIND
+               ramp = tanh((2.0_RKIND*(t-config_time_varying_atmospheric_forcing_ramp_delay)) &
+                                        /config_time_varying_atmospheric_forcing_ramp)
+          else
+               ramp = 0.0_RKIND
+          end if
 
-    !$omp parallel
-    !$omp do schedule(runtime) private(windStressCoefficient)
-    do iCell = 1, nCells
+          !$omp parallel
+          !$omp do schedule(runtime) private(windStressCoefficient)
+          do iCell = 1, nCells
 
-       windSpeedU(iCell) = ramp*windSpeedU(iCell)
-       windSpeedV(iCell) = ramp*windSpeedV(iCell)
-       windSpeedMagnitude(iCell) = sqrt(windSpeedU(iCell)**2 + windSpeedV(iCell)**2)
-       windStressCoefficient = (0.75_RKIND + 0.067_RKIND * windSpeedMagnitude(iCell)) * 0.001_RKIND   ! Garratt 1977
-       if (windStressCoefficient > windStressCoefficientLimit) then
-         windStressCoefficient = windStressCoefficientLimit
-       end if
+               windSpeedU(iCell) = ramp*windSpeedU(iCell)
+               windSpeedV(iCell) = ramp*windSpeedV(iCell)
+               windSpeedMagnitude(iCell) = sqrt(windSpeedU(iCell)**2 + windSpeedV(iCell)**2)
+               windStressCoefficient = (0.75_RKIND + 0.067_RKIND * windSpeedMagnitude(iCell)) * 0.001_RKIND   ! Garratt 1977
+               if (windStressCoefficient > windStressCoefficientLimit) then
+               windStressCoefficient = windStressCoefficientLimit
+               end if
 
-       windStressZonal(iCell) =  rhoAir * windSpeedU(iCell) * windSpeedMagnitude(iCell) * windStressCoefficient
-       windStressMeridional(iCell) = rhoAir * windSpeedV(iCell) * windSpeedMagnitude(iCell) * windStressCoefficient
+               windStressZonal(iCell) =  rhoAir * windSpeedU(iCell) * windSpeedMagnitude(iCell) * windStressCoefficient
+               windStressMeridional(iCell) = rhoAir * windSpeedV(iCell) * windSpeedMagnitude(iCell) * windStressCoefficient
+               atmosphericPressure(iCell) = ((1.0_RKIND-ramp)*atm_ref_pressure + ramp*atmosPressure(iCell)) - atm_ref_pressure
 
-       atmosphericPressure(iCell) = ((1.0_RKIND-ramp)*atm_ref_pressure + ramp*atmosPressure(iCell)) - atm_ref_pressure
-
-    enddo
-    !$omp end do
-    !$omp end parallel
+          enddo
+          !$omp end do
+          !$omp end parallel
+     end if
 
   end subroutine post_atmospheric_forcing!}}}
 
