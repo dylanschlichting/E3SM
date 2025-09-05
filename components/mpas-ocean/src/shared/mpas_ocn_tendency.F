@@ -592,7 +592,7 @@ contains
       logical :: &
          activeTracersOnly,  &! only compute tend for active tracers
          isActiveTracer,     &! is this group the active tracer group
-         computeBudgets       ! compute active tracer budgets
+         computeBudgets      ! compute active tracer budgets
 
       ! iterator and modified strings for tracer categories
       type (mpas_pool_iterator_type) :: groupItr
@@ -825,6 +825,22 @@ contains
            if (config_use_tracerGroup_ttd_forcing) &
              call mpas_log_write('TTD forcing not supported for freshwaterTracers group', MPAS_LOG_CRIT)
          endif
+
+         ! QC check as a reminder numericalMixingTracers are ONLY passed through the advection scheme
+         if ( groupName == 'numericalMixingTracers' ) then
+           if (config_use_tracerGroup_surface_restoring) &
+             call mpas_log_write('surface restoring not supported for numericalMixingTracers group', MPAS_LOG_CRIT)
+           if (config_use_tracerGroup_interior_restoring) &
+             call mpas_log_write('interior restoring not supported for numericalMixingTracers group', MPAS_LOG_CRIT)
+           if (config_use_tracerGroup_exponential_decay) &
+             call mpas_log_write('exponential decay not supported for numericalMixingTracers group', MPAS_LOG_CRIT)
+           if (config_use_tracerGroup_idealAge_forcing) &
+             ! TODO support this
+             call mpas_log_write('idealAge forcing not supported for numericalMixingTracers group', MPAS_LOG_CRIT)
+           if (config_use_tracerGroup_ttd_forcing) &
+             call mpas_log_write('TTD forcing not supported for numericalMixingTracers group', MPAS_LOG_CRIT)
+         endif
+
          ! Get tracers from pool, determine number of tracers in group
          call mpas_pool_get_array(tracersPool, groupName, &
                                   tracerGroup, timeLevel)
@@ -1248,13 +1264,19 @@ contains
             !$omp end parallel
          endif ! compute budgets
 
-         call ocn_tracer_hmix_tend(meshPool, layerThickEdgeMean, &
-                                   layerThickness, zMid, tracerGroup, &
-                                   RediKappa, slopeTriadUp, &
-                                   slopeTriadDown, limiterUp, &
-                                   limiterDown, dt, isActiveTracer, &
-                                   rediLimiterCount, &
-                                   tracerGroupTend, err)
+         ! Skip horizontal mixing tendency if numerical mixing tracers. No lateral 
+         ! diffusion is applied by default, so this is more of a failsafe.
+         if (trim(groupItr % memberName) /= 'numericalMixingTracers') then
+            call ocn_tracer_hmix_tend(meshPool, layerThickEdgeMean, &
+                                      layerThickness, zMid, tracerGroup, &
+                                      RediKappa, slopeTriadUp, &
+                                      slopeTriadDown, limiterUp, &
+                                      limiterDown, dt, isActiveTracer, &
+                                      rediLimiterCount, &
+                                      tracerGroupTend, err)
+            ! print *, 'Calculating ocn_tracer_hmix_tend for tracerGroup =', groupItr % memberName                         
+         else
+            ! print *, 'Skipping ocn_tracer_hmix_tend for tracerGroup = ', groupItr % memberName    
 
          if (computeBudgets) then
             ! Finish budget calculation by subtracting before, after
@@ -1354,8 +1376,9 @@ contains
 
          !
          ! Compute tracer tendency due to non-local flux computed in KPP
-         !
-         if (config_use_cvmix_kpp) then
+         ! Do not add non-local fluxes if numerical mixing tracers are used
+         if (config_use_cvmix_kpp .and. trim(groupItr % memberName) /= 'numericalMixingTracers') then
+
                call mpas_timer_start("non-local flux from KPP")
             if (.not. config_cvmix_kpp_nonlocal_with_implicit_mix) then
                if (computeBudgets) then
@@ -1402,12 +1425,19 @@ contains
                endif ! compute budgets
             end if ! not non-local with implicit mix
             call mpas_timer_stop("non-local flux from KPP")
+         else
+            ! print *, 'Skipping nonlocal flux for tracerGroup = ', groupItr % memberName
          end if ! KPP
 
          ! Compute tracer tendency due to production/destruction of
-         ! frazil ice
-         call ocn_frazil_forcing_tracers(meshPool, tracersPool, &
-                     groupName, forcingPool, tracerGroupTend, ecosysFrazilForcingPool, err)
+         ! frazil ice. Skip numerical mixing tracers
+         if (trim(groupItr % memberName) /= 'numericalMixingTracers') then
+                     groupName, forcingPool, tracerGroupTend, err)
+            call ocn_frazil_forcing_tracers(meshPool, tracersPool, &
+                                            groupName, forcingPool, tracerGroupTend, err)
+         else
+            ! print *, 'Skipping ocn_frazil_forcing_tracers for tracerGroup = ', groupItr % memberName
+         endif
 
 
       end if ! config use flag on

@@ -852,6 +852,15 @@
 <config_use_CFC11>.true.</config_use_CFC11>
 <config_use_CFC12>.true.</config_use_CFC12>
 
+<!-- tracer_forcing_numericalMixingTracers -->
+<config_use_numericalMixingTracers>.false.</config_use_numericalMixingTracers>
+<config_use_numericalMixingTracers_surface_bulk_forcing>.false.</config_use_numericalMixingTracers_surface_bulk_forcing>
+<config_use_numericalMixingTracers_surface_restoring>.false.</config_use_numericalMixingTracers_surface_restoring>
+<config_use_numericalMixingTracers_interior_restoring>.false.</config_use_numericalMixingTracers_interior_restoring>
+<config_use_numericalMixingTracers_exponential_decay>.false.</config_use_numericalMixingTracers_exponential_decay>
+<config_use_numericalMixingTracers_idealAge_forcing>.false.</config_use_numericalMixingTracers_idealAge_forcing>
+<config_use_numericalMixingTracers_ttd_forcing>.false.</config_use_numericalMixingTracers_ttd_forcing>
+
 <!-- AM_globalStats -->
 <config_AM_globalStats_enable>.true.</config_AM_globalStats_enable>
 <config_AM_globalStats_compute_interval>'output_interval'</config_AM_globalStats_compute_interval>
@@ -1334,5 +1343,12 @@
 <config_AM_conservationCheck_write_on_startup ocn_grid="SOwISC12to30E3r4">.true.</config_AM_conservationCheck_write_on_startup>
 <config_AM_conservationCheck_write_to_logfile>.true.</config_AM_conservationCheck_write_to_logfile>
 <config_AM_conservationCheck_restart_stream>'conservationCheckRestart'</config_AM_conservationCheck_restart_stream>
+
+<!-- AM_discreteVarianceDecay -->
+<config_AM_discreteVarianceDecay_enable>.false.</config_AM_discreteVarianceDecay_enable>
+<config_AM_discreteVarianceDecay_compute_interval>'output_interval'</config_AM_discreteVarianceDecay_compute_interval>
+<config_AM_discreteVarianceDecay_output_stream>'discreteVarianceDecayOutput'</config_AM_discreteVarianceDecay_output_stream>
+<config_AM_discreteVarianceDecay_compute_on_startup>.false.</config_AM_discreteVarianceDecay_compute_on_startup>
+<config_AM_discreteVarianceDecay_write_on_startup>.false.</config_AM_discreteVarianceDecay_write_on_startup>
 
 </namelist_defaults>
