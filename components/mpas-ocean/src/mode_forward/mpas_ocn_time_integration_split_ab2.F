@@ -417,7 +417,6 @@ module ocn_time_integration_split_ab2
 
       ! Set the numerical mixing tracers to the active tracers. 
       ! Order for the array is temp, salt, temp**2,salt**2
-      dims = shape(activeTracersNew)
 
       if ( config_use_numericalMixingTracers ) then
          numericalMixingTracers(1,:,:) = activeTracersNew(indexTemperature,:,:)

@@ -1277,6 +1277,7 @@ contains
             ! print *, 'Calculating ocn_tracer_hmix_tend for tracerGroup =', groupItr % memberName                         
          else
             ! print *, 'Skipping ocn_tracer_hmix_tend for tracerGroup = ', groupItr % memberName    
+         endif
 
          if (computeBudgets) then
             ! Finish budget calculation by subtracting before, after
@@ -1432,9 +1433,8 @@ contains
          ! Compute tracer tendency due to production/destruction of
          ! frazil ice. Skip numerical mixing tracers
          if (trim(groupItr % memberName) /= 'numericalMixingTracers') then
-                     groupName, forcingPool, tracerGroupTend, err)
             call ocn_frazil_forcing_tracers(meshPool, tracersPool, &
-                                            groupName, forcingPool, tracerGroupTend, err)
+                     groupName, forcingPool, tracerGroupTend, ecosysFrazilForcingPool, err)
          else
             ! print *, 'Skipping ocn_frazil_forcing_tracers for tracerGroup = ', groupItr % memberName
          endif
