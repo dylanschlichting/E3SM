@@ -58,6 +58,25 @@
 	</var_struct>
 </var_struct>
 
+<var_struct name="tend" time_levs="1">
+        <var_struct name="tracersTend" time_levs="1">
+                <var_array name="numericalMixingTracersTend" type="real" dimensions="nVertLevels nCells Time" packages="numericalMixingTracersPKG" missing_value="FILLVAL" missing_value_mask="cellMask">
+                        <var name="passiveTemperatureTend" array_group="numericalMixingGRP" units="C m s^-1"
+                        description="time tendency of passive potential temperature measured as change in degrees times layerThickness per second"
+                        />
+                        <var name="passiveSalinityTend" array_group="numericalMixingGRP" units="m 1.e-3 s^-1"
+                        description="time tendency of passive salinity measured as change in practical salinity units times layerThickness per second"
+                        />
+                        <var name="passiveTemperatureSquaredTend" array_group="numericalMixingGRP" units="C m s^-1"
+                        description="time tendency of passive potential temperature squared measured as change in degrees times layerThickness per second"
+                        />
+                        <var name="passiveSalinitySquaredTend" array_group="numericalMixingGRP" units="m {1.e-3}^2 s^-1"
+                        description="time tendency of passive salinity squared measured as change in practical salinity units times layerThickness per second"
+                        />
+                </var_array>
+        </var_struct>
+</var_struct>
+
 <var_struct name="forcing" time_levs="1">
 	<var_struct name="tracersSurfaceFlux" time_levs="1">
 		<var_array name="numericalMixingTracersSurfaceFlux" type="real" dimensions="nCells Time" packages="numericalMixingTracersPKG">
@@ -121,3 +140,4 @@
 		</var_array>
 	</var_struct>
 </var_struct>
+

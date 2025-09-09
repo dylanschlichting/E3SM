@@ -33,11 +33,11 @@
 	    />
 	</var_array>
     <var_array name="chiPhyVerTracer" type="real" dimensions="nVertLevels nCells Time">
-		<var name="chiPhyVerSalt" array_group="chiSpurTracerBR08" units="(g kg^-1)^2 s^-1"
-		description="Destruction of prescribed vertical salinity variance"
-		/>
 		<var name="chiPhyVerTemp" array_group="chiSpurTracerBR08" units="(deg C)^2 s^-1"
 		description="Destruction of prescribed vertical temperature variance"
+		/>
+		<var name="chiPhyVerSalt" array_group="chiSpurTracerBR08" units="(g kg^-1)^2 s^-1"
+		description="Destruction of prescribed vertical salinity variance"
 		/>
 	</var_array>
 </var_struct>
