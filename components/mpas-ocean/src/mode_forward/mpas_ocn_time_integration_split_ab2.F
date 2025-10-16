@@ -2385,10 +2385,8 @@ module ocn_time_integration_split_ab2
                         layerThicknessNew(k,iCell)
                      end do
                      end do
-#ifndef MPAS_OPENACC
                      !$omp end do
                      !$omp end parallel
-#endif
 
                      ! limit salinity in separate loop
                      if (trim(groupItr%memberName) == &
@@ -2402,10 +2400,8 @@ module ocn_time_integration_split_ab2
                            tracersGroupNew(indexSalinity,k,iCell))
                         end do
                         end do
-#ifndef MPAS_OPENACC
                         !$omp end do
                         !$omp end parallel
-#endif
                      end if
 
                      ! Reset debugTracers to fixed value at the surface
@@ -2457,10 +2453,8 @@ module ocn_time_integration_split_ab2
                               end do
                            end if
                         end do ! cells
-#ifndef MPAS_OPENACC
                         !$omp end do
                         !$omp end parallel
-#endif
                      end if ! debug tracers
                   end if ! use tracer group
                end if ! tracer

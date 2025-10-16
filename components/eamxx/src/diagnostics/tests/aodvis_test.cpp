@@ -3,8 +3,8 @@
 #include "catch2/catch.hpp"
 #include "diagnostics/register_diagnostics.hpp"
 #include "share/field/field_utils.hpp"
-#include "share/grid/mesh_free_grids_manager.hpp"
-#include "share/util/eamxx_setup_random_test.hpp"
+#include "share/data_managers/mesh_free_grids_manager.hpp"
+#include "share/core/eamxx_setup_random_test.hpp"
 #include "share/util/eamxx_universal_constants.hpp"
 
 namespace scream {
@@ -62,7 +62,7 @@ TEST_CASE("aodvis") {
   tau.get_header().get_tracking().update_time_stamp(t0);
   // Input (randomized) sunlit
   FieldLayout scalar2d_layout = grid->get_2d_scalar_layout();
-  FieldIdentifier sunlit_fid("sunlit", scalar2d_layout, nondim, grid->name());
+  FieldIdentifier sunlit_fid("sunlit_mask", scalar2d_layout, nondim, grid->name());
   Field sunlit(sunlit_fid);
   sunlit.allocate_view();
   sunlit.get_header().get_tracking().update_time_stamp(t0);
@@ -112,6 +112,7 @@ TEST_CASE("aodvis") {
 
     const auto tau_h  = tau.get_view<const Real ***, Host>();
     const auto aod_hf = diag->get_diagnostic();
+    const auto aod_mask = aod_hf.get_header().get_extra_data<Field>("mask_field");
 
     Field aod_tf = diag->get_diagnostic().clone();
     auto aod_t = aod_tf.get_view<Real *, Host>();
@@ -133,6 +134,8 @@ TEST_CASE("aodvis") {
     if(SCREAM_BFB_TESTING) {
       REQUIRE(views_are_equal(aod_hf, aod_tf));
     }
+    // Ensure the masks are identical (should be pointing exactly to each other)
+    REQUIRE(views_are_equal(aod_mask, sunlit));
   }
 }
 

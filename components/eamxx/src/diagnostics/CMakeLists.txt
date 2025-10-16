@@ -9,6 +9,7 @@ set(DIAGNOSTIC_SRCS
   field_at_height.cpp
   field_at_level.cpp
   field_at_pressure_level.cpp
+  histogram.cpp
   horiz_avg.cpp
   longwave_cloud_forcing.cpp
   number_path.cpp
@@ -30,7 +31,7 @@ set(DIAGNOSTIC_SRCS
 )
 
 add_library(diagnostics ${DIAGNOSTIC_SRCS})
-target_link_libraries(diagnostics PUBLIC scream_share)
+target_link_libraries(diagnostics PUBLIC eamxx_atm_process)
 
 if (NOT SCREAM_LIB_ONLY AND NOT SCREAM_ONLY_GENERATE_BASELINES)
   add_subdirectory(tests)
