@@ -615,6 +615,10 @@ contains
       real (kind=RKIND), dimension(:), pointer :: landIcePressure
       real (kind=RKIND) :: requiredSalt, allowedSalt, surfaceTemperatureFluxWithoutRunoff
 
+      real (kind=RKIND), dimension(:), pointer :: latCell
+      real (kind=RKIND) :: lat_min, lat_max ! latitude bounds for applying air temperature to runoff
+      real(kind=RKIND), parameter :: pi = 3.14159265358979323846_RKIND
+
       err = 0
 
       call mpas_pool_get_dimension(meshPool, 'nCellsArray', nCellsArray)
@@ -656,6 +660,10 @@ contains
       call mpas_pool_get_array(forcingPool, 'seaIceTemperatureFlux', seaIceTemperatureFlux)
       call mpas_pool_get_array(forcingPool, 'icebergTemperatureFlux', icebergTemperatureFlux)
       call mpas_pool_get_array(forcingPool, 'totalFreshWaterTemperatureFlux', totalFreshWaterTemperatureFlux)
+
+      call mpas_pool_get_array(meshPool, 'latCell', latCell)
+      lat_min = -30.0_RKIND * pi / 180.0_RKIND
+      lat_max =  32.0_RKIND * pi / 180.0_RKIND
 
       nCells = nCellsArray( 3 )
 
@@ -706,17 +714,24 @@ contains
            rainTemperatureFlux(iCell) = rainFlux(iCell) * tracerGroup(index_temperature_flux,minLevelCell(iCell),iCell) / rho_sw
            evapTemperatureFlux(iCell) = evaporationFlux(iCell) * tracerGroup(index_temperature_flux,minLevelCell(iCell),iCell) / rho_sw
            
-           if ( config_use_atmospheric_river_temp ) then
-               ! Set runoff temperatures to lowest level atmospheric air temperature with a max prescribed by 
-               ! config_atmospheric_river_temp_max. 
-               ! Runoff can only have a minimum temperature of 0.0C, since it is fresh water.
+         if ( config_use_atmospheric_river_temp ) then
+
+            if (latCell(iCell) >= lat_min .and. latCell(iCell) <= lat_max) then
+               ! Use atmospheric temperature in tropics/subtropics. This hack fixes a bug that will prevent
+               ! river temperatures from the Amazon and possibly Mississippi from spuriously superheating. 
                tracersSurfaceFluxRunoff(index_temperature_flux,iCell) = riverRunoffFlux(iCell) &
-                      * min( max(atmosphericTbot(iCell), 0.0_RKIND), config_atmospheric_river_temp_max) / rho_sw
-           else 
-               ! Set temperature to nearest neighbor SST
+                     * min( max(atmosphericTbot(iCell), 0.0_RKIND), config_atmospheric_river_temp_max) / rho_sw
+            else
+               ! Fall back to SST nearest neighbor outside region
                tracersSurfaceFluxRunoff(index_temperature_flux,iCell) = riverRunoffFlux(iCell) &
-                       * max(tracerGroup(index_temperature_flux,minLevelCell(iCell),iCell), 0.0_RKIND) / rho_sw
-           endif
+                     * max(tracerGroup(index_temperature_flux,minLevelCell(iCell),iCell), 0.0_RKIND) / rho_sw
+            end if
+
+         else
+            ! Original default behavior
+            tracersSurfaceFluxRunoff(index_temperature_flux,iCell) = riverRunoffFlux(iCell) &
+               * max(tracerGroup(index_temperature_flux,minLevelCell(iCell),iCell), 0.0_RKIND) / rho_sw
+         endif
            
            ! Accumulate fluxes that use the freezing point
            ! mrp performance note: should call ocn_freezing_temperature just once here
