@@ -583,10 +583,13 @@ add_default($nl, 'config_Redi_horizontal_ramp_max');
 ######################################################
 
 add_default($nl, 'config_submesoscale_enable');
+add_default($nl, 'config_submesoscale_scheme');
 add_default($nl, 'config_submesoscale_tau');
 add_default($nl, 'config_submesoscale_Ce');
 add_default($nl, 'config_submesoscale_Lfmin');
 add_default($nl, 'config_submesoscale_ds_max');
+add_default($nl, 'config_submesoscale_m_star');
+add_default($nl, 'config_submesoscale_n_star');
 
 ############################################
 # Namelist group: GM_eddy_parameterization #
