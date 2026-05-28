@@ -616,6 +616,7 @@ module ocn_forward_mode
       type (mpas_pool_type), pointer :: forcingPool
       type (mpas_pool_type), pointer :: ecosysFrazilForcingPool
       type (mpas_pool_type), pointer :: scratchPool
+      type (mpas_pool_type), pointer :: diagnosticsPool
 
       type (MPAS_timeInterval_type) :: timeStep
 
@@ -710,6 +711,7 @@ module ocn_forward_mode
            call mpas_pool_get_subpool(block_ptr % structs, 'state', statePool)
            call mpas_pool_get_subpool(block_ptr % structs, 'forcing', forcingPool)
            call mpas_pool_get_subpool(block_ptr % structs, 'scratch', scratchPool)
+           call mpas_pool_get_subpool(block_ptr % structs, 'diagnostics', diagnosticsPool)
            call ocn_forcing_build_fraction_absorbed_array(meshPool, statePool, forcingPool, ierr, 1)
            call ocn_frazil_forcing_build_arrays(domain, meshPool, forcingPool, statePool, err)
            if (config_use_ecosysTracers .and. config_use_ecosys_frazil_tendencies) then
@@ -735,7 +737,7 @@ module ocn_forward_mode
 
            if (config_submesoscale_enable) then
                call mpas_timer_start("submesoscale eddy velocity compute", .false.)
-               call ocn_submesoscale_compute_velocity()
+               call ocn_submesoscale_compute_velocity(forcingPool,diagnosticsPool)
                call mpas_timer_stop("submesoscale eddy velocity compute")
            end if
 

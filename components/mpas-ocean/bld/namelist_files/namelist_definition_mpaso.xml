@@ -495,9 +495,17 @@ Default: Defined in namelist_defaults.xml
 
 <entry id="config_submesoscale_enable" type="logical"
 	category="submesoscale_eddy_parameterization" group="submesoscale_eddy_parameterization">
-flag to enable the FK2011 parameterization for submesoscale eddies
+flag to enable the FK2011 or Bod2023 parameterization for submesoscale eddies
 
 Valid values: .true. or .false.
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_submesoscale_scheme" type="char*1024"
+	category="submesoscale_eddy_parameterization" group="submesoscale_eddy_parameterization">
+selects FK2011 or Bod2023 parameterization for submesoscale eddies
+
+Valid values: "FK2011" or "Bod2023"
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -531,6 +539,24 @@ maximum grid scale to scale up buoyancy gradient
 
 Valid values: around 1 degree
 Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_submesoscale_m_star" type="real"
+	category="submesoscale_eddy_parameterization" group="submesoscale_eddy_parameterization">
+dimensionless coefficient weighting the wind-driven turbulence contribution as discussed in Reichl and Hallberg (2023),  https://doi.org/10.1016/j.ocemod.2018.10.004
+
+Valid values: 0 to 1
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_submesoscale_n_star" type="real"
+	category="submesoscale_eddy_parameterization" group="submesoscale_eddy_parameterization">
+dimensionless coefficient weighting the convective turbulence contribution as discussed in Reichl and Hallberg (2023),  https://doi.org/10.1016/j.ocemod.2018.10.004
+
+Valid values: 0.01 to 0.09
+Default: Defined in namelist_defaults.xml
+</entry>
+
 </entry>
 
 
