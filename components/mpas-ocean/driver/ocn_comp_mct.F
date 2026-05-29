@@ -1060,6 +1060,7 @@ contains
       type (block_type), pointer :: block_ptr
 
       type (mpas_pool_type), pointer :: meshPool, statePool, forcingPool, averagePool, scratchPool
+      type (mpas_pool_type), pointer :: diagnosticsPool
       type (mpas_pool_type), pointer :: ecosysFrazilForcingPool
 
       type (MPAS_Time_Type) :: currTime
@@ -1182,6 +1183,7 @@ contains
             call mpas_pool_get_subpool(block_ptr % structs, 'state', statePool)
             call mpas_pool_get_subpool(block_ptr % structs, 'forcing', forcingPool)
             call mpas_pool_get_subpool(block_ptr % structs, 'scratch', scratchPool)
+            call mpas_pool_get_subpool(block_ptr % structs, 'diagnostics', diagnosticsPool)
 
             call ocn_forcing_build_fraction_absorbed_array(meshPool, statePool, forcingPool, ierr, 1)
             call ocn_frazil_forcing_build_arrays(domain, meshPool, forcingPool, statePool, ierr)

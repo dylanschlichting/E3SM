@@ -557,9 +557,6 @@ Valid values: 0.01 to 0.09
 Default: Defined in namelist_defaults.xml
 </entry>
 
-</entry>
-
-
 <!-- GM_eddy_parameterization -->
 
 <entry id="config_use_GM" type="logical"

@@ -365,35 +365,35 @@
 		<nml_option name="config_submesoscale_enable" type="logical" default_value=".false."
 					description="flag to enable the FK2011 or Bod2023 parameterization for submesoscale eddies"
 					possible_values=".true. or .false."
-					/>
+		/>
 		<nml_option name="config_submesoscale_scheme" type="character" default_value="Bod2023"
 					description="Selects the FK2011 or Bod2023 parameterization for submesoscale eddies"
 					possible_values="'FK2011' or 'Bod2023'"
-					/>
+		/>
 		<nml_option name="config_submesoscale_tau" type="real" default_value="172800" units="s"
 					description="timescale for frictional slumping of front (in seconds)"
 					possible_values="positive reals, between 1-10 days"
-					/>
+		/>
 		<nml_option name="config_submesoscale_Ce" type="real" default_value="0.06"
 					description="efficiency of submesoscale eddies"
 					possible_values="0.06 - 0.08"
-					/>
+		/>
 		<nml_option name="config_submesoscale_Lfmin" type="real" default_value="1000.0" units="m"
 					description="minimum frontal width (meters)"
 					possible_values="between 200 and 5000m"
-					/>
+		/>
 		<nml_option name="config_submesoscale_ds_max" type="real" default_value="100000.0" units="m"
 					description="maximum grid scale to scale up buoyancy gradient"
 					possible_values="around 1 degree"
-					/>
+		/>
 		<nml_option name="config_submesoscale_m_star" type="real" default_value="0.50"
-					description="dimensionless coefficient weighting the wind-driven turbulence contribution as discussed in Reichl and Hallberg (2023),  https://doi.org/10.1016/j.ocemod.2018.10.004"
+					description="dimensionless coefficient weighting the wind-driven turbulence contribution as discussed in Reichl and Hallberg 2023"
 					possible_values="0 to 1"
-					/>
+		/>
 		<nml_option name="config_submesoscale_n_star" type="real" default_value="0.066"
-					description="dimensionless coefficient weighting the convective turbulence contribution as discussed in Reichl and Hallberg (2023),  https://doi.org/10.1016/j.ocemod.2018.10.004"
+					description="dimensionless coefficient weighting the convective turbulence contribution as discussed in Reichl and Hallberg 2023"
 					possible_values="0.01 to 0.09"
-					/>
+		/>
 	</nml_record>
 	<nml_record name="GM_eddy_parameterization" mode="forward">
 		<nml_option name="config_use_GM" type="logical" default_value=".false."
