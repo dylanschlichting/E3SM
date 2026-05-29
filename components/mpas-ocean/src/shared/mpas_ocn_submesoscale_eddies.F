@@ -50,34 +50,66 @@ module ocn_submesoscale_eddies
   !
   !  routine ocn_submesoscale_compute_velocity
   !
-  !> \brief   Computes velocity from submesoscale eddies
+  !> \brief
+  !>   Computes the overturning streamfunction and induced transport
+  !>   velocity associated with mixed-layer submesoscale eddies.
+  !>
   !> \details
-  !>  This routine implements the Fox-Kemper et al 2011 submesoscale 
-  !>  parameterization (https://doi.org/10.1016/j.ocemod.2010.09.002).
-  !>  The transport velocity from the submesoscales is given by a 
-  !>  stream function which is given as
+  !>   This routine implements the Fox-Kemper et al. (2011) and
+  !>   Bodner et al. (2023) mixed-layer eddy parameterizations.
+  !>   For the Fox-Kemper et al. (2011) parameterization, the
+  !>   submesoscale overturning streamfunction is
   !>
-  !>  Psi_FK = C_e*Delta_S/L_f*H^2 int(bGrad_H)/sqrt(f^2+tau^-2)*mu(z)
-  !>
-  !>  here C_e is a specified efficiency, Delta_s is taken as 
-  !>  min(dcEdge,dsMax), H is the mixed layer depth, L_f is the subgrid
-  !>  frontal width that is scaled to the coarse grid, f is the 
-  !>  coriolis parameter, and tau is a time scale specified to prevent 
-  !>  the singularity near the equator.  the horizontal buoyancy gradient
-  !>  is integrated over the mixed layer depth and mu(z) is a non-dimensional
-  !>  shape function that is zero below the mixed layer depth. 
+  !>      Psi_FK =
+  !>         C_e * Delta_s / L_f *
+  !>         H^2 * |grad b| /
+  !>         sqrt(f^2 + tau^-2) * mu(z)
   !> 
-  !>  Psi_Bod = [ (C_r * Delta_s * |f| * h * H^2 * gradBuoyML) / 
-  !>              (m_* u_*^3 + n_* w_*^3)^(2/3) ] * mu(z)
+  !>   where
   !>
-  !>  where C_r = C_e / C_L with C_L = (c_2)^2 * c_3 * Ri = 0.25 (Sec. 3),
-  !>  h is the boundary layer depth (from KPP), u_* = (WindStressMag/rho_0)**(1/2) 
-  !>  is the friction
-  !>  velocity, and w_* is the convective velocity scale. This replaces
-  !>  the old Lf (based on N, H, f) with a turbulence-based arrested 
-  !>  frontal width that widens under strong surface forcing.
-  !>  Note: u_* = (WindStressMag/rho_0)**(1/2)
-
+  !>      C_e      : nondimensional efficiency coefficient
+  !>      Delta_s  : resolved horizontal grid scale,
+  !>                 taken as min(dcEdge, dsMax)
+  !>      L_f      : subgrid frontal width scale
+  !>      H        : mixed-layer depth
+  !>      f        : Coriolis parameter
+  !>      tau      : equatorial regularization timescale
+  !>      grad b   : mixed-layer averaged horizontal buoyancy gradient
+  !>      mu(z)    : nondimensional vertical structure function
+  !>
+  !>   The frontal width scale L_f is parameterized following
+  !>   Fox-Kemper et al. (2011) using the mixed-layer stratification,
+  !>   buoyancy gradient, and Coriolis frequency.
+  !>
+  !>   The shape function mu(z) smoothly tapers the overturning
+  !>   circulation to zero beneath the mixed layer.
+  !>
+  !>   For the Bodner et al. (2023) parameterization, the overturning
+  !>   streamfunction is
+  !>
+  !>      Psi_Bod =
+  !>         [ C_r * Delta_s * |f| * h * H^2 * |grad b| /
+  !>           (m_* u_*^3 + n_* w_*^3)^(2/3) ] * mu(z)
+  !>
+  !>   where
+  !>
+  !>      C_r      : rescaled efficiency coefficient,
+  !>                 C_r = C_e / C_L
+  !>      C_L      : arrest scale coefficient, assumed here
+  !>                 to be 0.25 following Bodner et al. (2023)
+  !>      h        : boundary layer depth from KPP
+  !>      u_*      : friction velocity,
+  !>                 u_* = sqrt(|tau_wind| / rho_0) 
+  !>      w_*      : convective velocity scale,
+  !>                 w_* = (-B0 * h)^(1/3)
+  !>      B0       : surface buoyancy flux
+  !>      m_*,n_*  : empirical weighting coefficients
+  !>
+  !>   In this formulation, the frontal width is no longer diagnosed
+  !>   from mixed-layer stratification. Instead, the overturning strength
+  !>   is regulated by a turbulence-based arrest scale that depends on
+  !>   both wind-driven and convective turbulent forcing.
+  !
   !***********************************************************************
 
   subroutine ocn_submesoscale_compute_velocity(forcingPool,diagnosticsPool)
@@ -231,7 +263,8 @@ module ocn_submesoscale_eddies
   !***********************************************************************
 
   subroutine compute_streamfunction_Bod2023( &
-      iEdge, cell1, cell2, zMLD, ds, gradBuoyML, zEdge, streamFunction, forcingPool, diagnosticsPool)
+      iEdge, cell1, cell2, zMLD, ds, gradBuoyML, zEdge, streamFunction, &
+      forcingPool, diagnosticsPool)
 
       integer, intent(in) :: iEdge, cell1, cell2
       real(kind=RKIND), intent(in) :: zMLD, ds, gradBuoyML
@@ -252,13 +285,13 @@ module ocn_submesoscale_eddies
          u_starEdge,                   & ! friction velocity
          w_starEdge,                   & ! convective velocity scale
          vel3,                         & ! m_* u_*^3 + n_* w_*^3
-         turbVelScale                    ! turbulent velocity scale denominator
+         turbVelScale2                    ! turbulent velocity scale denominator
       
       real (kind=RKIND), dimension(:), pointer :: &
-         surfaceBuoyancyForcing, & ! surface buoyancy flux 
-         boundaryLayerDepth, &     ! boundary layer depth from KPP
-         windStressZonal, &        ! zonal wind stress 
-         windStressMeridional      ! meridional wind stress 
+         surfaceBuoyancyForcing,       & ! surface buoyancy flux 
+         boundaryLayerDepth,           & ! boundary layer depth from KPP
+         windStressZonal,              & ! zonal wind stress 
+         windStressMeridional            ! meridional wind stress 
 
       call mpas_pool_get_array(diagnosticsPool, 'boundaryLayerDepth',  boundaryLayerDepth)
       call mpas_pool_get_array(diagnosticsPool, 'surfaceBuoyancyForcing', surfaceBuoyancyForcing)
@@ -268,15 +301,18 @@ module ocn_submesoscale_eddies
       ! Psi = [ (C_r * Delta_s * |f| * h * H^2 * gradBuoyML) /
       !         (m_* u_*^3 + n_* w_*^3)^(2/3) ] * mu(z)
 
-      ! Assume 
+      ! Assume  that C_L = (c_2)^2 * c_3 * Ri = 0.25 as in Bodner et al 2023
       Cr = Ce / 0.25_RKIND
       ! Interpolate surface buoyancy flux and boundary layer depth from centers to edge
-      surfaceBuoyancyForcingEdge = 0.5_RKIND * (surfaceBuoyancyForcing(cell1) + surfaceBuoyancyForcing(cell2))
-      boundaryLayerDepthEdge = 0.5_RKIND * (boundaryLayerDepth(cell1) + boundaryLayerDepth(cell2))
+      surfaceBuoyancyForcingEdge = 0.5_RKIND * (surfaceBuoyancyForcing(cell1) + & 
+                                                surfaceBuoyancyForcing(cell2))
+      boundaryLayerDepthEdge = 0.5_RKIND * (boundaryLayerDepth(cell1) + & 
+                                            boundaryLayerDepth(cell2))
 
-      ! From registry, positive flux increases buoyancy, so use max(0, -flux) 
-      ! to compute convective velocity scale
-      w_starEdge = (max(0.0_RKIND, -surfaceBuoyancyForcingEdge) * boundaryLayerDepthEdge)**(1.0_RKIND/3.0_RKIND)
+      ! From registry, positive flux increases buoyancy, But convection is driven by buoyancy 
+      ! loss, so you flip the sign and then clip to keep only destabilizing contributions.
+      w_starEdge = (max(0.0_RKIND, -surfaceBuoyancyForcingEdge) * & 
+                        boundaryLayerDepthEdge)**(1.0_RKIND/3.0_RKIND)
 
       ! Interpolate wind stress from centers to edge, compute magnitude and friction velocity
       tauXEdge = 0.5_RKIND * (windStressZonal(cell1) + windStressZonal(cell2))
@@ -285,16 +321,16 @@ module ocn_submesoscale_eddies
 
       ! Compute friction velocity 
       u_starEdge = (windStressMagEdge/rho_sw)**(0.5_RKIND)
-      turbVelScale = (m_star*u_starEdge**3 + n_star*w_starEdge**3)**(2.0_RKIND/3.0_RKIND)
-      ! To prevent a divide by zero error during very weak forcing, set a minimum value for the turbulent velocity
-      ! scale is. 
-      turbVelScale = max(turbVelScale, 1e-6_RKIND) 
+      turbVelScale2 = (m_star*u_starEdge**3 + n_star*w_starEdge**3)**(2.0_RKIND/3.0_RKIND)
+      ! We need to set a min value to avoid divide by zero errors. Physically, this 
+      ! corresponds to a near quiesent regime with almost no wind / buoyancy forcing. 
+      ! (m*u_*^3 + n*w_*^3) ~ (1e-6)^(3/2) = 1e-9, i.e. u_* or w_* ~ O(10^-3 m/s)
+      turbVelScale2 = max(turbVelScale2, 1e-6_RKIND) 
 
       do k = minLevelEdgeTop(iEdge)+1,maxLevelEdgeTop(iEdge)
          mu = compute_mle_shape(zEdge(k), zMLD)
          streamFunction(k) = ( (Cr*ds*abs(fEdge(iEdge))*boundaryLayerDepthEdge* &
-            zMLD**2*gradBuoyML) / turbVelScale ) * mu
-
+            zMLD**2*gradBuoyML) / turbVelScale2 ) * mu
       end do
 
   end subroutine compute_streamfunction_Bod2023
