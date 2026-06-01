@@ -519,9 +519,17 @@ Default: Defined in namelist_defaults.xml
 
 <entry id="config_submesoscale_Ce" type="real"
 	category="submesoscale_eddy_parameterization" group="submesoscale_eddy_parameterization">
-efficiency of submesoscale eddies
+efficiency coefficient (Ce) for Fox-Kemper et al. (2011) parameterization
 
 Valid values: 0.06 - 0.08
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_submesoscale_Cr" type="real"
+	category="submesoscale_eddy_parameterization" group="submesoscale_eddy_parameterization">
+rescaled efficiency coefficient (Cr) for Bodner et al. (2023) parameterization. Cr = Ce / C_L where C_L = 0.25
+
+Valid values: 0.0175 (Bodner 2023 value)
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -554,6 +562,38 @@ Default: Defined in namelist_defaults.xml
 dimensionless coefficient weighting the convective turbulence contribution as discussed in Reichl and Hallberg (2023),  https://doi.org/10.1016/j.ocemod.2018.10.004
 
 Valid values: 0.01 to 0.09
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_submesoscale_bld_growing_tfilt" type="real"
+	category="submesoscale_eddy_parameterization" group="submesoscale_eddy_parameterization">
+timescale for two-timescale running mean filter applied to boundary layer depth during growing phase in Bodner et al. (2023) parameterization (in seconds)
+
+Valid values: positive reals
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_submesoscale_bld_decaying_tfilt" type="real"
+	category="submesoscale_eddy_parameterization" group="submesoscale_eddy_parameterization">
+timescale for two-timescale running mean filter applied to boundary layer depth during decaying phase in Bodner et al. (2023) parameterization (in seconds)
+
+Valid values: positive reals
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_submesoscale_mld_growing_tfilt" type="real"
+	category="submesoscale_eddy_parameterization" group="submesoscale_eddy_parameterization">
+timescale for two-timescale running mean filter applied to mixed layer depth during growing phase in Bodner et al. (2023) parameterization (in seconds)
+
+Valid values: positive reals
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_submesoscale_mld_decaying_tfilt" type="real"
+	category="submesoscale_eddy_parameterization" group="submesoscale_eddy_parameterization">
+timescale for two-timescale running mean filter applied to mixed layer depth during decaying phase in Bodner et al. (2023) parameterization (in seconds)
+
+Valid values: positive reals
 Default: Defined in namelist_defaults.xml
 </entry>
 

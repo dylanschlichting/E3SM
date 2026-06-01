@@ -221,6 +221,10 @@
 <config_submesoscale_ds_max>100000.0</config_submesoscale_ds_max>
 <config_submesoscale_m_star>0.50</config_submesoscale_m_star>
 <config_submesoscale_n_star>0.066</config_submesoscale_n_star>
+<config_submesoscale_bld_growing_tfilt>0.0</config_submesoscale_bld_growing_tfilt>
+<config_submesoscale_bld_decaying_tfilt>86400.0</config_submesoscale_bld_decaying_tfilt>
+<config_submesoscale_mld_growing_tfilt>0.0</config_submesoscale_mld_growing_tfilt>
+<config_submesoscale_mld_decaying_tfilt>2.592e6</config_submesoscale_mld_decaying_tfilt>
 
 <!-- GM_eddy_parameterization -->
 <config_use_GM>.true.</config_use_GM>
