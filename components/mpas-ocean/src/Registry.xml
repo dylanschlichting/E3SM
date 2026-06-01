@@ -360,8 +360,12 @@
 					possible_values="positive reals, between 1-10 days"
 		/>
 		<nml_option name="config_submesoscale_Ce" type="real" default_value="0.06"
-					description="efficiency of submesoscale eddies"
+					description="efficiency coefficient (Ce) for Fox-Kemper et al. (2011) parameterization"
 					possible_values="0.06 - 0.08"
+		/>
+		<nml_option name="config_submesoscale_Cr" type="real" default_value="0.0175"
+					description="rescaled efficiency coefficient (Cr) for Bodner et al. (2023) parameterization. Cr = Ce / C_L where C_L = 0.25"
+					possible_values="0.0175 (Bodner 2023 value)"
 		/>
 		<nml_option name="config_submesoscale_Lfmin" type="real" default_value="1000.0" units="m"
 					description="minimum frontal width (meters)"
@@ -378,6 +382,22 @@
 		<nml_option name="config_submesoscale_n_star" type="real" default_value="0.066"
 					description="dimensionless coefficient weighting the convective turbulence contribution as discussed in Reichl and Hallberg 2023"
 					possible_values="0.01 to 0.09"
+		/>
+		<nml_option name="config_submesoscale_bld_growing_tfilt" type="real" default_value="0.0" units="s"
+					description="timescale for two-timescale running mean filter applied to boundary layer depth when deepening (entrainment). A value of 0 instantaneously sets the running mean to the current value of BLD. Smaller values allow faster response. Set to 0 to disable filtering."
+					possible_values="positive real (seconds), typically 3600-86400, or 0.0 for no filtering"
+		/>
+		<nml_option name="config_submesoscale_bld_decaying_tfilt" type="real" default_value="86400.0" units="s"
+					description="timescale for two-timescale running mean filter applied to boundary layer depth when shoaling (restratification). Larger values suppress rapid shoaling. Set to 0 to disable filtering."
+					possible_values="positive real (seconds), typically 86400-604800"
+		/>
+		<nml_option name="config_submesoscale_mld_growing_tfilt" type="real" default_value="0.0" units="s"
+					description="timescale for secondary (slower) two-timescale running mean filter applied to mixed-layer depth when deepening. A value of 0 instantaneously sets the running mean to the current value of BLD. Provides mesoscale temporal persistence."
+					possible_values="positive real (seconds), typically 86400-604800, or 0.0 for no filtering"
+		/>
+		<nml_option name="config_submesoscale_mld_decaying_tfilt" type="real" default_value="2.592E+06" units="s"
+					description="timescale for secondary (slower) two-timescale running mean filter applied to mixed-layer depth when shoaling. A value of 2.592E+06 s is 30 days. Provides mesoscale temporal persistence."
+					possible_values="positive real (seconds), typically 604800 (1 week) to 2.592E+06 (30 days) and longer"
 		/>
 	</nml_record>
 	<nml_record name="GM_eddy_parameterization" mode="forward">
