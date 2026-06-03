@@ -38,7 +38,8 @@ module ocn_submesoscale_eddies
    public :: ocn_submesoscale_compute_velocity, &
              ocn_submesoscale_init,             &
              ocn_submesoscale_finalize,         &
-             ocn_MLE_add_to_transport_vel
+             ocn_MLE_add_to_transport_vel,      &
+             ocn_submesoscale_update_filtered_fields
 
    real(kind=RKIND) :: tau, LfMin, Ce, dsMax, m_star, n_star
    real(kind=RKIND) :: BLD_growing_Tfilt, BLD_decaying_Tfilt
@@ -49,7 +50,7 @@ module ocn_submesoscale_eddies
    ! These are updated each time step to implement direction-dependent running mean
    real(kind=RKIND),dimension(:),allocatable :: BLD_filtered      ! Running mean of BLD (fast)
    real(kind=RKIND),dimension(:),allocatable :: BLD_filtered_slow  ! Running mean of BLD (slow)
-   real(kind=RKIND),dimension(:),allocatable :: wpup_filtered      ! Running mean of turbulent velocity scale
+   real(kind=RKIND),dimension(:),allocatable :: turbVelScale2_filtered      ! Running mean of turbulent velocity scale
   !***********************************************************************
 
   contains
@@ -212,17 +213,19 @@ module ocn_submesoscale_eddies
                 streamFunction)
         else if (config_submesoscale_scheme == 'Bod2023') then
             call compute_streamfunction_Bod2023( &
-                iEdge,          &
-                cell1,          &
-                cell2,          &
-                zMLD,           &
-                ds,             &
-                gradBuoyML,     &
-                zEdge,          &
-                streamFunction, & 
-                forcingPool,    &
-                diagnosticsPool, &
-                dt)
+                iEdge,                &
+                cell1,                &
+                cell2,                &
+                zMLD,                 &
+                ds,                   &
+                gradBuoyML,           &
+                zEdge,                &
+                streamFunction,       & 
+                forcingPool,          &
+                diagnosticsPool,      &
+                dt,                   &
+                layerThickEdgeMean,   &
+                gradDensityEddy)
         end if
 
         ! integrate in vertical to get the velocity
@@ -273,12 +276,14 @@ module ocn_submesoscale_eddies
   !***********************************************************************
 
   subroutine compute_streamfunction_Bod2023( &
-      iEdge, cell1, cell2, zMLD, ds, gradBuoyML, zEdge, streamFunction, &
-      forcingPool, diagnosticsPool, dt)
+      iEdge, cell1, cell2, zMLD_inst, ds, gradBuoyML_inst, zEdge, streamFunction, &
+      forcingPool, diagnosticsPool, dt, layerThickEdgeMean_arr, gradDensityEddy_arr)
 
       integer, intent(in) :: iEdge, cell1, cell2
-      real(kind=RKIND), intent(in) :: zMLD, ds, gradBuoyML, dt
+      real(kind=RKIND), intent(in) :: zMLD_inst, ds, gradBuoyML_inst, dt
       real(kind=RKIND), dimension(:), intent(in) :: zEdge
+      real(kind=RKIND), dimension(:,:), intent(in) :: layerThickEdgeMean_arr
+      real(kind=RKIND), dimension(:,:), intent(in) :: gradDensityEddy_arr
       real(kind=RKIND), dimension(:), intent(inout) :: streamFunction
       type(mpas_pool_type), intent(in) :: forcingPool, diagnosticsPool
 
@@ -287,20 +292,18 @@ module ocn_submesoscale_eddies
       real(kind=RKIND) :: &
          mu,                           &
          Cr,                           & ! C_r = C_e / C_L
-         boundaryLayerDepthEdge,       & ! boundary layer depth at edge
-         boundaryLayerDepthEdge_inst,  & ! instantaneous (unfiltered) BLD at edge
+         little_h_edge,                & ! little_h (fast-filtered BLD) at edge - used in streamfunction strength
+         big_H_edge,                   & ! big_H (additional slow-filtered of little_h, an "effective" MLD)
          surfaceBuoyancyForcingEdge,   & ! buoyancy flux interpolated to edge
          tauXEdge,                     & ! zonal wind stress at edge
          tauYEdge,                     & ! meridional wind stress at edge
          windStressMagEdge,            & ! |tau| at edge
          u_starEdge,                   & ! friction velocity
-         w_starEdge,                   & ! convective velocity scale (fast-filtered BLD)
-         w_starEdge_inst,              & ! convective velocity scale (instantaneous BLD)
-         vel3,                         & ! m_* u_*^3 + n_* w_*^3
-         turbVelScale2,                & ! turbulent velocity scale denominator (filtered)
-         turbVelScale2_inst,           & ! turbulent velocity scale (instantaneous)
-         BLD_input_cell1,              & ! BLD input for second-stage filter
-         BLD_input_cell2                 ! BLD input for second-stage filter
+         turbVelScale2,                & ! turbulent velocity scale denominator (filtered, interpolated from cells)
+         gradBuoyML_bigH,              & ! buoyancy gradient recomputed over big_H
+         hPartial,                     & ! partial layer thickness for big_H integration
+         hML_local,                    & ! local copy of hML for integration
+         hAv                             ! layer thickness average for integration
       
       real (kind=RKIND), dimension(:), pointer :: &
          surfaceBuoyancyForcing,       & ! surface buoyancy flux 
@@ -313,7 +316,7 @@ module ocn_submesoscale_eddies
       call mpas_pool_get_array(forcingPool, 'windStressZonal', windStressZonal)
       call mpas_pool_get_array(forcingPool, 'windStressMeridional', windStressMeridional)
 
-      ! Psi = [ (C_r * Delta_s * |f| * h * H^2 * gradBuoyML) /
+      ! Psi = [ (C_r * Delta_s * |f| * hbar * Hbar^2 * gradBuoyML) /
       !         (m_* u_*^3 + n_* w_*^3)^(2/3) ] * mu(z)
 
       ! -------------------------------------------------------------------------
@@ -336,8 +339,7 @@ module ocn_submesoscale_eddies
       !
       ! Key properties:
       !
-      !   - This is NOT a single exponential filter; it is a regime-dependent
-      !     relaxation with hysteresis.
+      !   - This is NOT is a regime-dependent relaxation with hysteresis.
       !   - Growing MLD (entrainment) responds more rapidly (smaller tau_growing).
       !   - Shoaling MLD is strongly damped (larger tau_decaying) to suppress
       !     high-frequency collapse of the mixed layer.
@@ -360,111 +362,126 @@ module ocn_submesoscale_eddies
       ! Cr is the rescaled efficiency coefficient (C_e / C_L where C_L = 0.25)
       Cr = Ce / 0.25_RKIND
 
+      ! -------------------------------------------------------------------------
+      ! Read pre-computed filtered fields (computed once per timestep in
+      ! ocn_submesoscale_update_filtered_fields, not in this edge loop).
+      ! This ensures consistent filtering across all cells and avoids race
+      ! conditions from multiple edges updating the same cell.
+      !
+      ! Following MOM6 convention:
+      !   - little_h (BLD_filtered) = fast-filtered BLD, represents the dynamically
+      !     active boundary layer depth, used in the streamfunction strength (h * H^2)
+      !   - big_H (BLD_filtered_slow) = slow-filtered MLD, provides temporal
+      !     persistence at mesoscale timescales, used for H^2 scaling and shape function
+      ! -------------------------------------------------------------------------
+
+      ! Interpolate little_h (fast-filtered BLD) from cells to edge
+      ! This is used for the "h" term in the streamfunction numerator
+      little_h_edge = 0.5_RKIND * (BLD_filtered(cell1) + BLD_filtered(cell2))
+
+      ! Interpolate big_H (slow-filtered MLD) from cells to edge
+      ! This is used for the "H^2" term and the shape function mu(z)
+      if (MLD_growing_Tfilt > 0.0_RKIND .or. MLD_decaying_Tfilt > 0.0_RKIND) then
+         big_H_edge = 0.5_RKIND * (BLD_filtered_slow(cell1) + BLD_filtered_slow(cell2))
+      else
+         ! No slow filtering: use little_h for big_H as well
+         big_H_edge = little_h_edge
+      end if
+
       ! Interpolate surface buoyancy flux from centers to edge
       surfaceBuoyancyForcingEdge = 0.5_RKIND * (surfaceBuoyancyForcing(cell1) + & 
                                                 surfaceBuoyancyForcing(cell2))
 
-      ! -------------------------------------------------------------------------
-      ! MOM6-style two-stage filtering for Bodner et al. (2023) parameterization
-      !
-      ! Stage 1 (fast filter): Apply two-timescale running mean to instantaneous BLD
-      !   to obtain "little_h" - the active mixing layer depth with diurnal cycle removed.
-      !   Uses BLD_growing/decaying timescales.
-      !
-      ! Stage 2 (slow filter): Apply two-timescale running mean to little_h
-      !   to obtain "big_H" - the mixed layer depth for streamfunction scaling.
-      !   Uses MLD_growing/decaying timescales (typically slower).
-      !
-      ! This follows MOM6 convention where:
-      !   - little_h represents the dynamically active boundary layer depth
-      !   - big_H provides temporal persistence at mesoscale timescales
-      ! -------------------------------------------------------------------------
-
-      ! Stage 1: Fast filter on instantaneous BLD -> little_h
-      if (BLD_growing_Tfilt > 0.0_RKIND .or. BLD_decaying_Tfilt > 0.0_RKIND) then
-         ! Apply two-timescale filter at cell centers
-         BLD_filtered(cell1) = rmean2ts(boundaryLayerDepth(cell1), BLD_filtered(cell1), &
-                                          BLD_growing_Tfilt, BLD_decaying_Tfilt, dt)
-         BLD_filtered(cell2) = rmean2ts(boundaryLayerDepth(cell2), BLD_filtered(cell2), &
-                                          BLD_growing_Tfilt, BLD_decaying_Tfilt, dt)
-      else
-         ! No filtering: little_h = instantaneous BLD
-         BLD_filtered(cell1) = boundaryLayerDepth(cell1)
-         BLD_filtered(cell2) = boundaryLayerDepth(cell2)
-      end if
-
-      ! Stage 2: Slow filter on little_h -> big_H (if configured)
-      if (MLD_growing_Tfilt > 0.0_RKIND .or. MLD_decaying_Tfilt > 0.0_RKIND) then
-         ! Apply two-timescale filter to the already-filtered little_h
-         BLD_filtered_slow(cell1) = rmean2ts(BLD_filtered(cell1), BLD_filtered_slow(cell1), &
-                                                MLD_growing_Tfilt, MLD_decaying_Tfilt, dt)
-         BLD_filtered_slow(cell2) = rmean2ts(BLD_filtered(cell2), BLD_filtered_slow(cell2), &
-                                                MLD_growing_Tfilt, MLD_decaying_Tfilt, dt)
-         ! Use big_H (slow-filtered) for streamfunction scaling
-         boundaryLayerDepthEdge = 0.5_RKIND * (BLD_filtered_slow(cell1) + BLD_filtered_slow(cell2))
-      else
-         ! No slow filtering: use little_h (fast-filtered) for streamfunction scaling
-         boundaryLayerDepthEdge = 0.5_RKIND * (BLD_filtered(cell1) + BLD_filtered(cell2))
-      end if
-
       ! Interpolate wind stress from centers to edge, compute magnitude and friction velocity.
-      ! This must be done BEFORE computing turbVelScale2, as u_starEdge is used in that calculation.
       tauXEdge = 0.5_RKIND * (windStressZonal(cell1) + windStressZonal(cell2))
       tauYEdge = 0.5_RKIND * (windStressMeridional(cell1) + windStressMeridional(cell2))
       windStressMagEdge = (tauXEdge**2 + tauYEdge**2)**(0.5_RKIND)
 
       ! Compute friction velocity and impose a numerical floor for weakly forced regimes.
-      ! In MOM6, ustar_min_dflt = 2.0e-4 * omega * (GV%Angstrom_Z + GV%dZ_subroundoff)
-      ! where omega = 7.291e-5 s^-1, Angstrom_Z ≈ 1e-10 m, and dZ_subroundoff is an
-      ! even smaller roundoff-scale quantity. This gives ustar_min ~ O(10^-18 m s^-1),
-      ! effectively zero and intended only to prevent exact division-by-zero.
       u_starEdge = (windStressMagEdge/rho_sw)**(0.5_RKIND)
       u_starEdge = max(u_starEdge, 1e-18_RKIND)
 
-      ! From registry, positive flux increases buoyancy, but convection is driven by buoyancy 
-      ! loss, so we flip the sign and then clip to keep only destabilizing contributions.
-      ! MOM6 does NOT actually use w_star^2 directly in its MLE formulation.
-      ! Instead, it constructs a turbulent velocity scale via:
-      !   wpup = (m_*u_*^3 + n_*w_*^3)^(2/3)
-      ! and then applies a floor (MIN_WSTAR2) to that quantity.
-      ! The cube-root form here (w_starEdge = (-B0*h)^(1/3)) is only an intermediate
-      ! scaling used to build w_star^3, not a prognostic or limited w_star^2 variable.
+      ! Read pre-computed filtered turbulent velocity scale from cells to edge
+      ! (computed once per timestep in ocn_submesoscale_update_filtered_fields)
+      turbVelScale2 = 0.5_RKIND * (turbVelScale2_filtered(cell1) + turbVelScale2_filtered(cell2))
 
-      ! First, compute wpup from INSTANTANEOUS (unfiltered) BLD and buoyancy flux
-      boundaryLayerDepthEdge_inst = 0.5_RKIND * (boundaryLayerDepth(cell1) + boundaryLayerDepth(cell2))
-      w_starEdge_inst = (max(0.0_RKIND, -surfaceBuoyancyForcingEdge) * &
-                         boundaryLayerDepthEdge_inst)**(1.0_RKIND/3.0_RKIND)
-      
-      ! Compute unfiltered turbVelScale2
-      turbVelScale2_inst = (m_star*u_starEdge**3 + n_star*w_starEdge_inst**3)**(2.0_RKIND/3.0_RKIND)
-      ! In MOM6 examples, w'u' is capped at 1e-9 to prevent numerical issues even though their 
-      ! default values are 1e-24. 
-      turbVelScale2_inst = max(turbVelScale2_inst, 1e-9_RKIND)
-      
-      ! Apply two-timescale filter to turbVelScale2 using fast timescales (BLD_growing/decaying)
-      ! This follows MOM6 convention: wpup is filtered with the same fast timescales used for BLD
-      if (BLD_growing_Tfilt > 0.0_RKIND .or. BLD_decaying_Tfilt > 0.0_RKIND) then
-         ! Filter at cell centers and then average to edge
-         wpup_filtered(cell1) = rmean2ts(turbVelScale2_inst, wpup_filtered(cell1), &
-                                           BLD_growing_Tfilt, BLD_decaying_Tfilt, dt)
-         wpup_filtered(cell2) = rmean2ts(turbVelScale2_inst, wpup_filtered(cell2), &
-                                           BLD_growing_Tfilt, BLD_decaying_Tfilt, dt)
-         turbVelScale2 = 0.5_RKIND * (wpup_filtered(cell1) + wpup_filtered(cell2))
-      else
-         turbVelScale2 = turbVelScale2_inst
+      ! -------------------------------------------------------------------------
+      ! Recompute buoyancy gradient over big_H depth for consistent vertical scaling
+      !
+      ! In MOM6, the streamfunction uses the slow-filtered mixed layer depth (big_H)
+      ! for the H^2 scaling and the shape function mu(z). The buoyancy gradient
+      ! is also recomputed as the thickness-weighted average over big_H, not over
+      ! the instantaneous MLD.
+      !
+      ! We recompute the vertical average of gradDensityEddy from the surface
+      ! down to big_H depth. This ensures consistency between the depth scale
+      ! used in H^2 and the depth over which the buoyancy gradient is averaged.
+      ! -------------------------------------------------------------------------
+
+      ! Recompute buoyancy gradient averaged over big_H depth
+      gradBuoyML_bigH = 0.0_RKIND
+      hML_local = 0.0_RKIND
+
+      do k = minLevelEdgeTop(iEdge)+1, maxLevelEdgeTop(iEdge)
+
+         ! layer thickness (edge-mean, consistent with vertical integral elsewhere)
+         hAv = layerThickEdgeMean_arr(k,iEdge)
+
+         ! stop if we exceed big_H
+         if (hML_local + hAv > big_H_edge) then
+            hAv = big_H_edge - hML_local
+         end if
+
+         if (hAv <= 0.0_RKIND) exit
+
+         gradBuoyML_bigH = gradBuoyML_bigH + hAv * gradDensityEddy_arr(k,iEdge)
+         hML_local = hML_local + hAv
+
+         if (hML_local >= big_H_edge) exit
+
+      end do
+
+      ! normalize
+      gradBuoyML_bigH = gradBuoyML_bigH / max(big_H_edge, 1.0E-20_RKIND)
+      ! convert to buoyancy gradient
+      gradBuoyML_bigH = gravity * gradBuoyML_bigH / rho_sw
+
+      if (iEdge <= 100) then
+         call mpas_log_write('  little_h_edge = $r m', realArgs=(/ little_h_edge /))
+         call mpas_log_write('  big_H_edge = $r m', realArgs=(/ big_H_edge /))
+         call mpas_log_write('  u_starEdge = $r m/s', realArgs=(/ u_starEdge /))
+         call mpas_log_write('  turbVelScale2 = $r m^2/s^2', realArgs=(/ turbVelScale2 /))
+         call mpas_log_write('  gradBuoyML_bigH = $r m/s^2', realArgs=(/ gradBuoyML_bigH /))
       end if
 
-      ! Now compute w_starEdge for use in the streamfunction (using filtered BLD for consistency)
-      ! NOTE: Use boundaryLayerDepthEdge which is either the fast-filtered BLD (if
-      ! MLD_growing/decaying_Tfilt are zero) or the slow-filtered BLD (if they are non-zero).
-      w_starEdge = (max(0.0_RKIND, -surfaceBuoyancyForcingEdge) * & 
-                        boundaryLayerDepthEdge)**(1.0_RKIND/3.0_RKIND)
-
       do k = minLevelEdgeTop(iEdge)+1,maxLevelEdgeTop(iEdge)
-         mu = compute_mle_shape(zEdge(k), zMLD)
-         streamFunction(k) = ( (Cr*ds*abs(fEdge(iEdge))*boundaryLayerDepthEdge* &
-            zMLD**2*gradBuoyML) / turbVelScale2 ) * mu
+
+         mu = compute_mle_shape(zEdge(k), big_H_edge)
+         if (turbVelScale2 <= 1.0E-12_RKIND .or. &
+            big_H_edge <= 1.0E-12_RKIND .or. &
+            little_h_edge <= 1.0E-12_RKIND .or. &
+            abs(gradBuoyML_bigH) <= 1.0E-18_RKIND) then
+            streamFunction(k) = 0.0_RKIND
+            
+            else
+
+            streamFunction(k) = ( (Cr*ds*abs(fEdge(iEdge))*little_h_edge * &
+                                 big_H_edge**2 * gradBuoyML_bigH) / &
+                                 turbVelScale2 ) * mu
+         end if
+
       end do
+
+      ! Print streamfunction for first edge
+      if (iEdge == 1) then
+         call mpas_log_write('Bod2023 streamfunction (edge 1):')
+         do k = minLevelEdgeTop(iEdge)+1, maxLevelEdgeTop(iEdge)
+            if (streamFunction(k) > 0.0_RKIND) then
+               call mpas_log_write('  streamFunction($i) = $r m^2/s', &
+                  intArgs=(/ k /), realArgs=(/ streamFunction(k) /))
+            end if
+         end do
+      end if
 
   end subroutine compute_streamfunction_Bod2023
 
@@ -646,14 +663,105 @@ module ocn_submesoscale_eddies
      if (trim(config_submesoscale_scheme) == 'Bod2023') then
         allocate(BLD_filtered(nCellsAll))
         allocate(BLD_filtered_slow(nCellsAll))
-        allocate(wpup_filtered(nCellsAll))
+        allocate(turbVelScale2_filtered(nCellsAll))
 
         BLD_filtered(:) = 0.0_RKIND
         BLD_filtered_slow(:) = 0.0_RKIND
-        wpup_filtered(:) = 0.0_RKIND
+        turbVelScale2_filtered(:) = 0.0_RKIND
      end if
 
    end subroutine ocn_submesoscale_init
+
+   !***********************************************************************
+
+   !***********************************************************************
+   !
+   !  routine ocn_submesoscale_update_filtered_fields
+   !
+   !> \brief   Update time-filtered fields for Bodner et al. (2023) parameterization
+   !> \details
+   !>  This routine updates the filtered boundary layer depth and turbulent velocity
+   !>  scale fields. It is called ONCE per timestep before the edge loop to ensure
+   !>  consistent filtering across all cells.
+   !>  
+   !***********************************************************************
+
+   subroutine ocn_submesoscale_update_filtered_fields(diagnosticsPool, forcingPool, dt)
+
+      type(mpas_pool_type), intent(in) :: diagnosticsPool, forcingPool
+      real(kind=RKIND), intent(in) :: dt
+
+      integer :: iCell
+      real(kind=RKIND) :: u_starCell, w_starCell_inst, turbVelScale2_inst_cell
+      real(kind=RKIND) :: surfaceBuoyancyForcingCell, boundaryLayerDepthCell
+      character(len=512) :: msg
+      real(kind=RKIND) :: windStressZonalCell, windStressMeridionalCell, windStressMagCell
+      real(kind=RKIND), dimension(:), pointer :: &
+         boundaryLayerDepth,   &
+         surfaceBuoyancyForcing, &
+         windStressZonal,      &
+         windStressMeridional
+
+      call mpas_pool_get_array(diagnosticsPool, 'boundaryLayerDepth', boundaryLayerDepth)
+      call mpas_pool_get_array(diagnosticsPool, 'surfaceBuoyancyForcing', surfaceBuoyancyForcing)
+      call mpas_pool_get_array(forcingPool, 'windStressZonal', windStressZonal)
+      call mpas_pool_get_array(forcingPool, 'windStressMeridional', windStressMeridional)
+
+      !$omp parallel do schedule(runtime) &
+      !$omp private(iCell, u_starCell, w_starCell_inst, turbVelScale2_inst_cell, &
+      !$omp         surfaceBuoyancyForcingCell, boundaryLayerDepthCell, &
+      !$omp         windStressZonalCell, windStressMeridionalCell, windStressMagCell)
+      do iCell = 1, nCellsAll
+         boundaryLayerDepthCell = boundaryLayerDepth(iCell)
+         surfaceBuoyancyForcingCell = surfaceBuoyancyForcing(iCell)
+
+         ! Stage 1: Fast filter on instantaneous BLD -> little_h (BLD_filtered)
+         if (BLD_growing_Tfilt > 0.0_RKIND .or. BLD_decaying_Tfilt > 0.0_RKIND) then
+            BLD_filtered(iCell) = rmean2ts(boundaryLayerDepthCell, BLD_filtered(iCell), &
+                                             BLD_growing_Tfilt, BLD_decaying_Tfilt, dt)
+         else
+            BLD_filtered(iCell) = boundaryLayerDepthCell
+         end if
+
+         ! Stage 2: Slow filter on little_h -> big_H (BLD_filtered_slow)
+         if (MLD_growing_Tfilt > 0.0_RKIND .or. MLD_decaying_Tfilt > 0.0_RKIND) then
+            BLD_filtered_slow(iCell) = rmean2ts(BLD_filtered(iCell), BLD_filtered_slow(iCell), &
+                                                  MLD_growing_Tfilt, MLD_decaying_Tfilt, dt)
+         else
+            BLD_filtered_slow(iCell) = BLD_filtered(iCell)
+         end if
+
+         ! Compute instantaneous turbulent velocity scale for this cell
+         windStressZonalCell = windStressZonal(iCell)
+         windStressMeridionalCell = windStressMeridional(iCell)
+         windStressMagCell = (windStressZonalCell**2 + windStressMeridionalCell**2)**(0.5_RKIND)
+         u_starCell = (windStressMagCell/rho_sw)**(0.5_RKIND)
+         u_starCell = max(u_starCell, 1e-18_RKIND)
+
+         w_starCell_inst = (max(0.0_RKIND, -surfaceBuoyancyForcingCell) * &
+                            boundaryLayerDepthCell)**(1.0_RKIND/3.0_RKIND)
+
+         turbVelScale2_inst_cell = (m_star*u_starCell**3 + n_star*w_starCell_inst**3)**(2.0_RKIND/3.0_RKIND)
+         turbVelScale2_inst_cell = max(turbVelScale2_inst_cell, 1e-9_RKIND)
+
+         ! Filter turbulent velocity scale
+         if (BLD_growing_Tfilt > 0.0_RKIND .or. BLD_decaying_Tfilt > 0.0_RKIND) then
+            turbVelScale2_filtered(iCell) = rmean2ts(turbVelScale2_inst_cell, turbVelScale2_filtered(iCell), &
+                                                       BLD_growing_Tfilt, BLD_decaying_Tfilt, dt)
+         else
+            turbVelScale2_filtered(iCell) = turbVelScale2_inst_cell
+         end if
+
+         if (iCell <= 10) then
+            call mpas_log_write('BLD raw = $r', realArgs=(/ boundaryLayerDepthCell /))
+            call mpas_log_write('B0 = $r', realArgs=(/ surfaceBuoyancyForcingCell /))
+            call mpas_log_write('tau = $r', realArgs=(/ windStressMagCell /))
+         end if
+
+      end do
+      !$omp end parallel do
+
+   end subroutine ocn_submesoscale_update_filtered_fields
 
    !***********************************************************************
 
@@ -663,7 +771,7 @@ module ocn_submesoscale_eddies
      
      if (allocated(BLD_filtered)) deallocate(BLD_filtered)
      if (allocated(BLD_filtered_slow)) deallocate(BLD_filtered_slow)
-     if (allocated(wpup_filtered)) deallocate(wpup_filtered)
+     if (allocated(turbVelScale2_filtered)) deallocate(turbVelScale2_filtered)
 
    end subroutine ocn_submesoscale_finalize
 
