@@ -565,6 +565,14 @@ Valid values: 0.01 to 0.09
 Default: Defined in namelist_defaults.xml
 </entry>
 
+<entry id="config_submesoscale_Cr" type="real"
+	category="submesoscale_eddy_parameterization" group="submesoscale_eddy_parameterization">
+rescaled efficiency coefficient (Cr) for Bodner et al. (2023) parameterization. Cr = Ce / C_L, with C_L = c_2^2 * c_3 * Ri
+
+Valid values: 0 to 1.0
+Default: Defined in namelist_defaults.xml
+</entry>
+
 <entry id="config_submesoscale_bld_growing_tfilt" type="real"
 	category="submesoscale_eddy_parameterization" group="submesoscale_eddy_parameterization">
 timescale for two-timescale running mean filter applied to boundary layer depth during growing phase in Bodner et al. (2023) parameterization (in seconds)

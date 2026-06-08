@@ -122,6 +122,11 @@ add_default($nl, 'config_submesoscale_Lfmin');
 add_default($nl, 'config_submesoscale_ds_max');
 add_default($nl, 'config_submesoscale_m_star');
 add_default($nl, 'config_submesoscale_n_star');
+add_default($nl, 'config_submesoscale_Cr');
+add_default($nl, 'config_submesoscale_bld_growing_tfilt');
+add_default($nl, 'config_submesoscale_bld_decaying_tfilt');
+add_default($nl, 'config_submesoscale_mld_growing_tfilt');
+add_default($nl, 'config_submesoscale_mld_decaying_tfilt');
 
 ############################################
 # Namelist group: GM_eddy_parameterization #
