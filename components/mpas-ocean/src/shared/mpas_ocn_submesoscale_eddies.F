@@ -51,6 +51,7 @@ module ocn_submesoscale_eddies
    real(kind=RKIND),dimension(:),allocatable :: BLD_filtered      ! Running mean of BLD (fast)
    real(kind=RKIND),dimension(:),allocatable :: BLD_filtered_slow  ! Running mean of BLD (slow)
    real(kind=RKIND),dimension(:),allocatable :: turbVelScale2_filtered      ! Running mean of turbulent velocity scale
+   logical :: filters_initialized = .false.
   !***********************************************************************
 
   contains
@@ -446,13 +447,13 @@ module ocn_submesoscale_eddies
       ! convert to buoyancy gradient
       gradBuoyML_bigH = gravity * gradBuoyML_bigH / rho_sw
 
-      if (iEdge <= 100) then
-         call mpas_log_write('  little_h_edge = $r m', realArgs=(/ little_h_edge /))
-         call mpas_log_write('  big_H_edge = $r m', realArgs=(/ big_H_edge /))
-         call mpas_log_write('  u_starEdge = $r m/s', realArgs=(/ u_starEdge /))
-         call mpas_log_write('  turbVelScale2 = $r m^2/s^2', realArgs=(/ turbVelScale2 /))
-         call mpas_log_write('  gradBuoyML_bigH = $r m/s^2', realArgs=(/ gradBuoyML_bigH /))
-      end if
+      ! if (iEdge <= 100) then
+      !    call mpas_log_write('  little_h_edge = $r m', realArgs=(/ little_h_edge /))
+      !    call mpas_log_write('  big_H_edge = $r m', realArgs=(/ big_H_edge /))
+      !    call mpas_log_write('  u_starEdge = $r m/s', realArgs=(/ u_starEdge /))
+      !    call mpas_log_write('  turbVelScale2 = $r m^2/s^2', realArgs=(/ turbVelScale2 /))
+      !    call mpas_log_write('  gradBuoyML_bigH = $r m/s^2', realArgs=(/ gradBuoyML_bigH /))
+      ! end if
 
       do k = minLevelEdgeTop(iEdge)+1,maxLevelEdgeTop(iEdge)
 
@@ -473,15 +474,15 @@ module ocn_submesoscale_eddies
       end do
 
       ! Print streamfunction for first edge
-      if (iEdge == 1) then
-         call mpas_log_write('Bod2023 streamfunction (edge 1):')
-         do k = minLevelEdgeTop(iEdge)+1, maxLevelEdgeTop(iEdge)
-            if (streamFunction(k) > 0.0_RKIND) then
-               call mpas_log_write('  streamFunction($i) = $r m^2/s', &
-                  intArgs=(/ k /), realArgs=(/ streamFunction(k) /))
-            end if
-         end do
-      end if
+      ! if (iEdge == 1) then
+      !    call mpas_log_write('Bod2023 streamfunction (edge 1):')
+      !    do k = minLevelEdgeTop(iEdge)+1, maxLevelEdgeTop(iEdge)
+      !       if (streamFunction(k) > 0.0_RKIND) then
+      !          call mpas_log_write('  streamFunction($i) = $r m^2/s', &
+      !             intArgs=(/ k /), realArgs=(/ streamFunction(k) /))
+      !       end if
+      !    end do
+      ! end if
 
   end subroutine compute_streamfunction_Bod2023
 
@@ -661,18 +662,89 @@ module ocn_submesoscale_eddies
 
      ! Allocate storage for time-filtered BLD and MLD fields (only needed for Bodner scheme)
      if (trim(config_submesoscale_scheme) == 'Bod2023') then
-        allocate(BLD_filtered(nCellsAll))
-        allocate(BLD_filtered_slow(nCellsAll))
-        allocate(turbVelScale2_filtered(nCellsAll))
+         allocate(BLD_filtered(nCellsAll))
+         allocate(BLD_filtered_slow(nCellsAll))
+         allocate(turbVelScale2_filtered(nCellsAll))
 
-        BLD_filtered(:) = 0.0_RKIND
-        BLD_filtered_slow(:) = 0.0_RKIND
-        turbVelScale2_filtered(:) = 0.0_RKIND
+         BLD_filtered(:) = 0.0_RKIND
+         BLD_filtered_slow(:) = 0.0_RKIND
+         turbVelScale2_filtered(:) = 0.0_RKIND
+
+         filters_initialized = .false.
      end if
 
    end subroutine ocn_submesoscale_init
 
    !***********************************************************************
+
+   subroutine ocn_submesoscale_initialize_filters(diagnosticsPool, forcingPool)
+
+      type(mpas_pool_type), intent(in) :: diagnosticsPool
+      type(mpas_pool_type), intent(in) :: forcingPool
+
+      integer :: iCell
+
+      real(kind=RKIND) :: &
+         boundaryLayerDepthCell, &
+         surfaceBuoyancyForcingCell, &
+         windStressMagCell, &
+         u_starCell, &
+         w_starCell_inst, &
+         turbVelScale2_inst_cell
+
+      real(kind=RKIND), dimension(:), pointer :: &
+         boundaryLayerDepth, &
+         surfaceBuoyancyForcing, &
+         windStressZonal, &
+         windStressMeridional
+
+      call mpas_pool_get_array(diagnosticsPool, &
+         'boundaryLayerDepth', boundaryLayerDepth)
+
+      call mpas_pool_get_array(diagnosticsPool, &
+         'surfaceBuoyancyForcing', surfaceBuoyancyForcing)
+
+      call mpas_pool_get_array(forcingPool, &
+         'windStressZonal', windStressZonal)
+
+      call mpas_pool_get_array(forcingPool, &
+         'windStressMeridional', windStressMeridional)
+
+      !$omp parallel do schedule(runtime) &
+      !$omp private(iCell,boundaryLayerDepthCell,surfaceBuoyancyForcingCell, &
+      !$omp         windStressMagCell,u_starCell,w_starCell_inst, &
+      !$omp         turbVelScale2_inst_cell)
+      do iCell = 1, nCellsAll
+
+         boundaryLayerDepthCell = boundaryLayerDepth(iCell)
+
+         ! Seed filters from instantaneous state
+         BLD_filtered(iCell)      = boundaryLayerDepthCell
+         BLD_filtered_slow(iCell) = boundaryLayerDepthCell
+
+         surfaceBuoyancyForcingCell = surfaceBuoyancyForcing(iCell)
+
+         windStressMagCell = sqrt( &
+            windStressZonal(iCell)**2 + &
+            windStressMeridional(iCell)**2 )
+
+         u_starCell = sqrt(max(windStressMagCell/rho_sw,0.0_RKIND))
+
+         w_starCell_inst = ( &
+            max(0.0_RKIND,-surfaceBuoyancyForcingCell) * &
+            boundaryLayerDepthCell )**(1.0_RKIND/3.0_RKIND)
+
+         turbVelScale2_inst_cell = &
+            (m_star*u_starCell**3 + &
+               n_star*w_starCell_inst**3)**(2.0_RKIND/3.0_RKIND)
+
+         turbVelScale2_filtered(iCell) = &
+            max(turbVelScale2_inst_cell,1.0E-9_RKIND)
+
+      end do
+      !$omp end parallel do
+
+   end subroutine ocn_submesoscale_initialize_filters
 
    !***********************************************************************
    !
@@ -706,6 +778,64 @@ module ocn_submesoscale_eddies
       call mpas_pool_get_array(diagnosticsPool, 'surfaceBuoyancyForcing', surfaceBuoyancyForcing)
       call mpas_pool_get_array(forcingPool, 'windStressZonal', windStressZonal)
       call mpas_pool_get_array(forcingPool, 'windStressMeridional', windStressMeridional)
+
+      !------------------------------------------------------------------
+      ! First-call initialization.
+      !
+      ! Seed the filters from the instantaneous state instead of zero.
+      ! This avoids a completely artificial spinup of little_h and big_H.
+      !------------------------------------------------------------------
+
+      if (.not. filters_initialized) then
+
+         !$omp parallel do schedule(runtime) &
+         !$omp private(iCell, u_starCell, w_starCell_inst, turbVelScale2_inst_cell, &
+         !$omp         surfaceBuoyancyForcingCell, boundaryLayerDepthCell, &
+         !$omp         windStressZonalCell, windStressMeridionalCell, windStressMagCell)
+         do iCell = 1, nCellsAll
+
+            boundaryLayerDepthCell = boundaryLayerDepth(iCell)
+            surfaceBuoyancyForcingCell = surfaceBuoyancyForcing(iCell)
+
+            windStressZonalCell = windStressZonal(iCell)
+            windStressMeridionalCell = windStressMeridional(iCell)
+
+            windStressMagCell = sqrt( &
+               windStressZonalCell**2 + &
+               windStressMeridionalCell**2 )
+
+            u_starCell = sqrt(windStressMagCell/rho_sw)
+            u_starCell = max(u_starCell, 1.0e-18_RKIND)
+
+            w_starCell_inst = ( &
+               max(0.0_RKIND,-surfaceBuoyancyForcingCell) * &
+               boundaryLayerDepthCell )**(1.0_RKIND/3.0_RKIND)
+
+            turbVelScale2_inst_cell = &
+               (m_star*u_starCell**3 + &
+                  n_star*w_starCell_inst**3)**(2.0_RKIND/3.0_RKIND)
+
+            turbVelScale2_inst_cell = &
+               max(turbVelScale2_inst_cell, 1.0e-9_RKIND)
+
+            ! Seed filters directly from instantaneous values
+
+            BLD_filtered(iCell)      = boundaryLayerDepthCell
+            BLD_filtered_slow(iCell) = boundaryLayerDepthCell
+
+            turbVelScale2_filtered(iCell) = turbVelScale2_inst_cell
+
+         end do
+         !$omp end parallel do
+
+         filters_initialized = .true.
+
+         call mpas_log_write( &
+            'Initialized Bod2023 filtered fields from instantaneous state.')
+
+         return
+
+      end if
 
       !$omp parallel do schedule(runtime) &
       !$omp private(iCell, u_starCell, w_starCell_inst, turbVelScale2_inst_cell, &
@@ -752,11 +882,11 @@ module ocn_submesoscale_eddies
             turbVelScale2_filtered(iCell) = turbVelScale2_inst_cell
          end if
 
-         if (iCell <= 10) then
-            call mpas_log_write('BLD raw = $r', realArgs=(/ boundaryLayerDepthCell /))
-            call mpas_log_write('B0 = $r', realArgs=(/ surfaceBuoyancyForcingCell /))
-            call mpas_log_write('tau = $r', realArgs=(/ windStressMagCell /))
-         end if
+         ! if (iCell <= 10) then
+         !    call mpas_log_write('BLD raw = $r', realArgs=(/ boundaryLayerDepthCell /))
+         !    call mpas_log_write('B0 = $r', realArgs=(/ surfaceBuoyancyForcingCell /))
+         !    call mpas_log_write('tau = $r', realArgs=(/ windStressMagCell /))
+         ! end if
 
       end do
       !$omp end parallel do
