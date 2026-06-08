@@ -41,7 +41,7 @@ module ocn_submesoscale_eddies
              ocn_MLE_add_to_transport_vel,      &
              ocn_submesoscale_update_filtered_fields
 
-   real(kind=RKIND) :: tau, LfMin, Ce, dsMax, m_star, n_star
+   real(kind=RKIND) :: tau, LfMin, Ce, dsMax, m_star, n_star, Cr
    real(kind=RKIND) :: BLD_growing_Tfilt, BLD_decaying_Tfilt
    real(kind=RKIND) :: MLD_growing_Tfilt, MLD_decaying_Tfilt
    real(kind=RKIND),dimension(:),allocatable :: time_scale
@@ -359,11 +359,6 @@ module ocn_submesoscale_eddies
       !   time scales.
       !
       ! -------------------------------------------------------------------------
-
-      ! Cr is the rescaled efficiency coefficient (C_e / C_L where C_L = 0.25)
-      Cr = Ce / 0.25_RKIND
-
-      ! -------------------------------------------------------------------------
       ! Read pre-computed filtered fields (computed once per timestep in
       ! ocn_submesoscale_update_filtered_fields, not in this edge loop).
       ! This ensures consistent filtering across all cells and avoids race
@@ -447,42 +442,12 @@ module ocn_submesoscale_eddies
       ! convert to buoyancy gradient
       gradBuoyML_bigH = gravity * gradBuoyML_bigH / rho_sw
 
-      ! if (iEdge <= 100) then
-      !    call mpas_log_write('  little_h_edge = $r m', realArgs=(/ little_h_edge /))
-      !    call mpas_log_write('  big_H_edge = $r m', realArgs=(/ big_H_edge /))
-      !    call mpas_log_write('  u_starEdge = $r m/s', realArgs=(/ u_starEdge /))
-      !    call mpas_log_write('  turbVelScale2 = $r m^2/s^2', realArgs=(/ turbVelScale2 /))
-      !    call mpas_log_write('  gradBuoyML_bigH = $r m/s^2', realArgs=(/ gradBuoyML_bigH /))
-      ! end if
-
       do k = minLevelEdgeTop(iEdge)+1,maxLevelEdgeTop(iEdge)
-
          mu = compute_mle_shape(zEdge(k), big_H_edge)
-         if (turbVelScale2 <= 1.0E-12_RKIND .or. &
-            big_H_edge <= 1.0E-12_RKIND .or. &
-            little_h_edge <= 1.0E-12_RKIND .or. &
-            abs(gradBuoyML_bigH) <= 1.0E-18_RKIND) then
-            streamFunction(k) = 0.0_RKIND
-            
-            else
-
-            streamFunction(k) = ( (Cr*ds*abs(fEdge(iEdge))*little_h_edge * &
+         streamFunction(k) = ( (Cr*ds*abs(fEdge(iEdge))*little_h_edge * &
                                  big_H_edge**2 * gradBuoyML_bigH) / &
                                  turbVelScale2 ) * mu
-         end if
-
       end do
-
-      ! Print streamfunction for first edge
-      ! if (iEdge == 1) then
-      !    call mpas_log_write('Bod2023 streamfunction (edge 1):')
-      !    do k = minLevelEdgeTop(iEdge)+1, maxLevelEdgeTop(iEdge)
-      !       if (streamFunction(k) > 0.0_RKIND) then
-      !          call mpas_log_write('  streamFunction($i) = $r m^2/s', &
-      !             intArgs=(/ k /), realArgs=(/ streamFunction(k) /))
-      !       end if
-      !    end do
-      ! end if
 
   end subroutine compute_streamfunction_Bod2023
 
@@ -633,6 +598,7 @@ module ocn_submesoscale_eddies
      tau = config_submesoscale_tau
      n_star = config_submesoscale_n_star
      m_star = config_submesoscale_m_star
+     Cr = config_submesoscale_cr
      BLD_growing_Tfilt = config_submesoscale_bld_growing_tfilt
      BLD_decaying_Tfilt = config_submesoscale_bld_decaying_tfilt
      MLD_growing_Tfilt = config_submesoscale_mld_growing_tfilt
@@ -715,7 +681,6 @@ module ocn_submesoscale_eddies
       !$omp         windStressMagCell,u_starCell,w_starCell_inst, &
       !$omp         turbVelScale2_inst_cell)
       do iCell = 1, nCellsAll
-
          boundaryLayerDepthCell = boundaryLayerDepth(iCell)
 
          ! Seed filters from instantaneous state
@@ -881,12 +846,6 @@ module ocn_submesoscale_eddies
          else
             turbVelScale2_filtered(iCell) = turbVelScale2_inst_cell
          end if
-
-         ! if (iCell <= 10) then
-         !    call mpas_log_write('BLD raw = $r', realArgs=(/ boundaryLayerDepthCell /))
-         !    call mpas_log_write('B0 = $r', realArgs=(/ surfaceBuoyancyForcingCell /))
-         !    call mpas_log_write('tau = $r', realArgs=(/ windStressMagCell /))
-         ! end if
 
       end do
       !$omp end parallel do

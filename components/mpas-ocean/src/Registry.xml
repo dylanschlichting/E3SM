@@ -363,10 +363,6 @@
 					description="efficiency coefficient (Ce) for Fox-Kemper et al. (2011) parameterization"
 					possible_values="0.06 - 0.08"
 		/>
-		<nml_option name="config_submesoscale_Cr" type="real" default_value="0.0175"
-					description="rescaled efficiency coefficient (Cr) for Bodner et al. (2023) parameterization. Cr = Ce / C_L where C_L = 0.25"
-					possible_values="0.0175 (Bodner 2023 value)"
-		/>
 		<nml_option name="config_submesoscale_Lfmin" type="real" default_value="1000.0" units="m"
 					description="minimum frontal width (meters)"
 					possible_values="between 200 and 5000m"
@@ -382,6 +378,10 @@
 		<nml_option name="config_submesoscale_n_star" type="real" default_value="0.066"
 					description="dimensionless coefficient weighting the convective turbulence contribution as discussed in Reichl and Hallberg 2023"
 					possible_values="0.01 to 0.09"
+		/>
+		<nml_option name="config_submesoscale_Cr" type="real" default_value="0.0175"
+					description="rescaled efficiency coefficient (Cr) for Bodner et al. (2023) parameterization. Cr = Ce / C_L, with C_L = c_2^2 * c_3 * Ri"
+					possible_values="0 to 1.0"
 		/>
 		<nml_option name="config_submesoscale_bld_growing_tfilt" type="real" default_value="0.0" units="s"
 					description="timescale for two-timescale running mean filter applied to boundary layer depth when deepening (entrainment). A value of 0 instantaneously sets the running mean to the current value of BLD. Smaller values allow faster response. Set to 0 to disable filtering."

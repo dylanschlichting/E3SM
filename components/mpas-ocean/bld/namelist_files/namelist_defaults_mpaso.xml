@@ -217,6 +217,7 @@
 <config_submesoscale_ds_max>100000.0</config_submesoscale_ds_max>
 <config_submesoscale_m_star>0.50</config_submesoscale_m_star>
 <config_submesoscale_n_star>0.066</config_submesoscale_n_star>
+<config_submesoscale_Cr>0.0175</config_submesoscale_Cr>
 <config_submesoscale_bld_growing_tfilt>0.0</config_submesoscale_bld_growing_tfilt>
 <config_submesoscale_bld_decaying_tfilt>86400.0</config_submesoscale_bld_decaying_tfilt>
 <config_submesoscale_mld_growing_tfilt>0.0</config_submesoscale_mld_growing_tfilt>
