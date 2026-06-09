@@ -32,7 +32,7 @@
 			description="Numerical salinity mixing due to total advection from Burchard and Rennau method."
 	    />
 	</var_array>
-    <var_array name="chiPhyVerTracer" type="real" dimensions="nVertLevels nCells Time">
+    <var_array name="chiPhyVerTracer" type="real" dimensions="nVertLevelsP1 nCells Time">
 		<var name="chiPhyVerTemp" array_group="chiSpurTracerBR08" units="(deg C)^2 s^-1"
 		description="Destruction of prescribed vertical temperature variance"
 		/>
