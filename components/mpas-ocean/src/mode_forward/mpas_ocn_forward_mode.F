@@ -737,6 +737,10 @@ module ocn_forward_mode
 
            if (config_submesoscale_enable) then
                call mpas_timer_start("submesoscale eddy velocity compute", .false.)
+               if (trim(config_submesoscale_scheme) == 'Bod2023') then
+                  call ocn_submesoscale_update_filtered_fields( &
+                     diagnosticsPool, forcingPool, dt)
+               end if
                call ocn_submesoscale_compute_velocity(forcingPool,diagnosticsPool,dt)
                call mpas_timer_stop("submesoscale eddy velocity compute")
            end if
