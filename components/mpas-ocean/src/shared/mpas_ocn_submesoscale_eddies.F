@@ -48,10 +48,13 @@ module ocn_submesoscale_eddies
    
    ! Storage for time-filtered boundary layer and mixed layer depths
    ! These are updated each time step to implement direction-dependent running mean
-   real(kind=RKIND),dimension(:),allocatable :: BLD_filtered      ! Running mean of BLD (fast)
-   real(kind=RKIND),dimension(:),allocatable :: BLD_filtered_slow  ! Running mean of BLD (slow)
-   real(kind=RKIND),dimension(:),allocatable :: turbVelScale2_filtered      ! Running mean of turbulent velocity scale
+   real(kind=RKIND),dimension(:),allocatable :: BLD_filtered           ! Running mean of BLD (fast)
+   real(kind=RKIND),dimension(:),allocatable :: BLD_filtered_slow      ! Running mean of BLD (slow)
+   real(kind=RKIND),dimension(:),allocatable :: turbVelScale2_filtered ! Running mean of tur. vel. scale
    logical :: filters_initialized = .false.
+   logical :: bodner_nan_reported = .false.
+   ! Conservative CFL-style safety factor for the Bodner-induxed transport clip.
+   real(kind=RKIND), parameter :: bodner_transport_cfl = 0.25_RKIND
   !***********************************************************************
 
   contains
@@ -118,7 +121,11 @@ module ocn_submesoscale_eddies
   !>   In this formulation, the frontal width is no longer diagnosed
   !>   from mixed-layer stratification. Instead, the overturning strength
   !>   is regulated by a turbulence-based arrest scale that depends on
-  !>   both wind-driven and convective turbulent forcing.
+  !>   both wind-driven and convective turbulent forcing. We draw heavily 
+  !>   from MOM6's implementation to enforce numerical stability. This includes
+  !>   double filtering the boundary layer depth, turbulent velocity scale, 
+  !>   and limiting the streamfunction magnitude as shown in their  
+  !>   src/parameterizations/lateral/MOM_mixed_layer_restrat.F90
   !
   !***********************************************************************
 
@@ -134,10 +141,20 @@ module ocn_submesoscale_eddies
      real(kind=RKIND), intent(in) :: dt
      integer :: k, nEdges, nCells, iCell, iEdge, cell1, cell2, indMLDedge
 
-     real(kind=RKIND),dimension(:),allocatable :: streamFunction, zEdge
+      real(kind=RKIND),dimension(:),allocatable :: streamFunction, zEdge
+      real(kind=RKIND) :: bodner_edge_scale, bodner_vel, bodner_vel_max
 
       ! Shared / FK2011 variables
      real(kind=RKIND) :: zMLD, bvfML, hML, gradBuoyML, bvfAv, hAv, ds
+
+      if (trim(config_submesoscale_scheme) == 'Bod2023') then
+
+         if (.not. filters_initialized) then
+            normalMLEvelocity(:,:) = 0.0_RKIND
+            return
+         end if
+
+      end if
 
      nEdges = nEdgesHalo(2)
 
@@ -227,6 +244,63 @@ module ocn_submesoscale_eddies
                 dt,                   &
                 layerThickEdgeMean,   &
                 gradDensityEddy)
+
+            ! ------------------------------------------------------------------
+            ! MOM6-style transport limiter for the Bodner overturning profile.
+            !
+            ! The Bodner streamfunction Psi_k is converted to a layer-wise
+            ! Bodner-induced transport velocity through
+            !
+            !   w_k = -(Psi_k - Psi_{k+1}) / h_k
+            !
+            ! where h_k = layerThickEdgeMean(k,iEdge).
+            !
+            ! The limiter checks the CFL-like condition
+            !
+            !   |w_k| <= c * h_k / dt
+            !
+            ! with c = bodner_transport_cfl = 0.25. Larger c makes the limiter
+            ! less restrictive.
+            !
+            ! Example caps for c = 0.25:
+            !   - h_k = 10 m, dt = 300 s  -> |w_k| <= 8.3e-3 m/s  -> 2.5 m/step
+            !   - h_k = 20 m, dt = 900 s  -> |w_k| <= 5.6e-3 m/s  -> 5.0 m/step
+            !   - h_k = 50 m, dt = 1800 s -> |w_k| <= 6.9e-3 m/s  -> 12.5 m/step
+            !
+            ! These are per-timestep limits, so the implied daily displacement
+            ! can still be O(100 m/day) or larger if the limiter is active
+            ! every step.
+            !
+            ! If any layer violates this condition, we compute a single edge-wide
+            ! scale factor
+            !
+            !   s = min_k [ (c * h_k / dt) / |w_k| ]
+            !
+            ! and then rescale the whole streamfunction:
+            !
+            !   Psi_k <- s * Psi_k
+            !
+            ! so the vertical shape of the overturning is preserved, but the
+            ! amplitude is reduced until every layer satisfies the limit.
+            !
+            ! This mirrors the MOM6 psi_mag clip concept: clip the column-wide
+            ! overturning strength, not each layer independently.
+            !
+            bodner_edge_scale = 1.0_RKIND
+            do k = minLevelEdgeTop(iEdge), maxLevelEdgeTop(iEdge)
+               bodner_vel = -(streamFunction(k) - streamFunction(k+1)) / &
+                            layerThickEdgeMean(k,iEdge)
+               bodner_vel_max = bodner_transport_cfl * &
+                                layerThickEdgeMean(k,iEdge) / max(dt, 1.0E-20_RKIND)
+               if (abs(bodner_vel) > bodner_vel_max) then
+                  bodner_edge_scale = min(bodner_edge_scale, &
+                                          bodner_vel_max / max(abs(bodner_vel), 1.0E-20_RKIND))
+               end if
+            end do
+
+            if (bodner_edge_scale < 1.0_RKIND) then
+               streamFunction(:) = bodner_edge_scale * streamFunction(:)
+            end if
         end if
 
         ! integrate in vertical to get the velocity
@@ -287,12 +361,12 @@ module ocn_submesoscale_eddies
       real(kind=RKIND), dimension(:,:), intent(in) :: gradDensityEddy_arr
       real(kind=RKIND), dimension(:), intent(inout) :: streamFunction
       type(mpas_pool_type), intent(in) :: forcingPool, diagnosticsPool
+      character(len=512) :: msg
 
       integer :: k
 
       real(kind=RKIND) :: &
          mu,                           &
-         Cr,                           & ! C_r = C_e / C_L
          little_h_edge,                & ! little_h (fast-filtered BLD) at edge - used in streamfunction strength
          big_H_edge,                   & ! big_H (additional slow-filtered of little_h, an "effective" MLD)
          surfaceBuoyancyForcingEdge,   & ! buoyancy flux interpolated to edge
@@ -322,7 +396,7 @@ module ocn_submesoscale_eddies
 
       ! -------------------------------------------------------------------------
       ! Mixed-layer time filtering (MOM6-style two-timescale running mean) as shown
-      ! in src/parameterizations/lateral/MOM_mixed_layer_restrat.F90
+      ! in their src/parameterizations/lateral/MOM_mixed_layer_restrat.F90
       !
       ! The boundary layer depth used in the Bodner et al. (2023) MLE scheme is
       ! not used directly from the instantaneous KPP output. Instead, MOM6 applies
@@ -400,6 +474,11 @@ module ocn_submesoscale_eddies
       ! Read pre-computed filtered turbulent velocity scale from cells to edge
       ! (computed once per timestep in ocn_submesoscale_update_filtered_fields)
       turbVelScale2 = 0.5_RKIND * (turbVelScale2_filtered(cell1) + turbVelScale2_filtered(cell2))
+      if (turbVelScale2 /= turbVelScale2) then
+         streamFunction(:) = 0.0_RKIND
+         return
+      end if
+      turbVelScale2 = max(turbVelScale2, 1.0E-18_RKIND)
 
       ! -------------------------------------------------------------------------
       ! Recompute buoyancy gradient over big_H depth for consistent vertical scaling
@@ -417,7 +496,6 @@ module ocn_submesoscale_eddies
       ! Recompute buoyancy gradient averaged over big_H depth
       gradBuoyML_bigH = 0.0_RKIND
       hML_local = 0.0_RKIND
-
       do k = minLevelEdgeTop(iEdge)+1, maxLevelEdgeTop(iEdge)
 
          ! layer thickness (edge-mean, consistent with vertical integral elsewhere)
@@ -438,6 +516,23 @@ module ocn_submesoscale_eddies
       end do
 
       ! normalize
+      if (big_H_edge <= 1.0E-12_RKIND .or. &
+          big_H_edge /= big_H_edge) then
+         if (.not. bodner_nan_reported) then
+            write(msg,'(A,I6,2(A,I8),4(A,E14.6))') &
+               'Bodner bad big_H at iEdge=', iEdge, &
+               ' cell1=', cell1, &
+               ' cell2=', cell2, &
+               ' little_h=', little_h_edge, &
+               ' big_H=', big_H_edge, &
+               ' turbVel2=', turbVelScale2, &
+               ' gradBuoy=', gradBuoyML_bigH
+            call mpas_log_write(msg)
+            bodner_nan_reported = .true.
+         end if
+         streamFunction(:) = 0.0_RKIND
+         return
+      end if
       gradBuoyML_bigH = gradBuoyML_bigH / max(big_H_edge, 1.0E-20_RKIND)
       ! convert to buoyancy gradient
       gradBuoyML_bigH = gravity * gradBuoyML_bigH / rho_sw
@@ -445,8 +540,8 @@ module ocn_submesoscale_eddies
       do k = minLevelEdgeTop(iEdge)+1,maxLevelEdgeTop(iEdge)
          mu = compute_mle_shape(zEdge(k), big_H_edge)
          streamFunction(k) = ( (Cr*ds*abs(fEdge(iEdge))*little_h_edge * &
-                                 big_H_edge**2 * gradBuoyML_bigH) / &
-                                 turbVelScale2 ) * mu
+                                big_H_edge**2 * gradBuoyML_bigH) / &
+                                turbVelScale2 ) * mu
       end do
 
   end subroutine compute_streamfunction_Bod2023
@@ -469,6 +564,32 @@ module ocn_submesoscale_eddies
    !>   This creates direction-dependent relaxation with hysteresis,
    !>   useful for filtering high-frequency variability (e.g., diurnal
    !>   cycle) while preserving physical entrainment events.
+   !>
+   !>   Physical interpretation:
+   !>     - tau_growing is the response time for a real deepening event.
+   !>       A smaller tau_growing makes the filter follow entrainment more
+   !>       quickly.
+   !>     - tau_decaying is the smoothing time for shoaling or collapse of
+   !>       the signal. A larger tau_decaying suppresses short-lived drops.
+   !>
+   !>   Example using the Bodner settings in this case:
+   !>     BLD filter:
+   !>       tau_growing  = 0 s
+   !>       tau_decaying = 86400 s
+   !>
+   !>       - If the diagnosed boundary layer depth deepens from 20 m to 60 m,
+   !>         the filtered BLD follows immediately because the growing time
+   !>         scale is zero.
+   !>       - If it then shoals back toward 20 m, the filter relaxes on a
+   !>         1-day timescale, so short-lived shoaling pulses are damped.
+   !>
+   !>     MLD filter:
+   !>       tau_growing  = 0 s
+   !>       tau_decaying = 2.592e6 s
+   !>
+   !>       - A deepening MLD is again followed immediately.
+   !>       - A brief shoaling pulse is retained much longer, with the filtered
+   !>         MLD relaxing on a 30-day timescale.
    !>
    !>   Note: if tau_growing = tau_decaying = 0, the filter reduces to
    !>   instantaneous reset (filtered = signal).
@@ -637,7 +758,8 @@ module ocn_submesoscale_eddies
          turbVelScale2_filtered(:) = 0.0_RKIND
 
          filters_initialized = .false.
-     end if
+         bodner_nan_reported = .false.
+      end if
 
    end subroutine ocn_submesoscale_init
 
@@ -666,13 +788,10 @@ module ocn_submesoscale_eddies
 
       call mpas_pool_get_array(diagnosticsPool, &
          'boundaryLayerDepth', boundaryLayerDepth)
-
       call mpas_pool_get_array(diagnosticsPool, &
          'surfaceBuoyancyForcing', surfaceBuoyancyForcing)
-
       call mpas_pool_get_array(forcingPool, &
          'windStressZonal', windStressZonal)
-
       call mpas_pool_get_array(forcingPool, &
          'windStressMeridional', windStressMeridional)
 
@@ -861,6 +980,7 @@ module ocn_submesoscale_eddies
      if (allocated(BLD_filtered)) deallocate(BLD_filtered)
      if (allocated(BLD_filtered_slow)) deallocate(BLD_filtered_slow)
      if (allocated(turbVelScale2_filtered)) deallocate(turbVelScale2_filtered)
+     bodner_nan_reported = .false.
 
    end subroutine ocn_submesoscale_finalize
 
