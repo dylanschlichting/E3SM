@@ -244,18 +244,21 @@ module ocn_submesoscale_eddies
                 dt,                   &
                 layerThickEdgeMean,   &
                 gradDensityEddy)
-
             ! ------------------------------------------------------------------
             ! MOM6-style transport limiter for the Bodner overturning profile.
             !
             ! The Bodner streamfunction Psi_k is converted to a layer-wise
-            ! Bodner-induced transport velocity through
+            ! diagnostic transport tendency through
             !
             !   w_k = -(Psi_k - Psi_{k+1}) / h_k
             !
             ! where h_k = layerThickEdgeMean(k,iEdge).
             !
-            ! The limiter checks the CFL-like condition
+            ! This quantity represents the implied vertical transport associated
+            ! with the vertical divergence of the MLE bolus circulation, rather
+            ! than a prognostic vertical velocity.
+            !
+            ! The limiter checks the CFL-like constraint
             !
             !   |w_k| <= c * h_k / dt
             !
@@ -267,9 +270,9 @@ module ocn_submesoscale_eddies
             !   - h_k = 20 m, dt = 900 s  -> |w_k| <= 5.6e-3 m/s  -> 5.0 m/step
             !   - h_k = 50 m, dt = 1800 s -> |w_k| <= 6.9e-3 m/s  -> 12.5 m/step
             !
-            ! These are per-timestep limits, so the implied daily displacement
-            ! can still be O(100 m/day) or larger if the limiter is active
-            ! every step.
+            ! These are per-timestep limits on implied tracer transport, so the
+            ! accumulated displacement can still be O(100 m/day) or larger if the
+            ! limiter is active every step.
             !
             ! If any layer violates this condition, we compute a single edge-wide
             ! scale factor
@@ -281,11 +284,12 @@ module ocn_submesoscale_eddies
             !   Psi_k <- s * Psi_k
             !
             ! so the vertical shape of the overturning is preserved, but the
-            ! amplitude is reduced until every layer satisfies the limit.
+            ! amplitude is reduced until the implied transport constraint is
+            ! satisfied everywhere in the column.
             !
             ! This mirrors the MOM6 psi_mag clip concept: clip the column-wide
             ! overturning strength, not each layer independently.
-            !
+            ! ------------------------------------------------------------------
             bodner_edge_scale = 1.0_RKIND
             do k = minLevelEdgeTop(iEdge), maxLevelEdgeTop(iEdge)
                bodner_vel = -(streamFunction(k) - streamFunction(k+1)) / &

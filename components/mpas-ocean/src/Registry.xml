@@ -407,11 +407,11 @@
 					possible_values="positive real (seconds), typically 86400-604800"
 		/>
 		<nml_option name="config_submesoscale_mld_growing_tfilt" type="real" default_value="0.0" units="s"
-					description="timescale for secondary (slower) two-timescale running mean filter applied to mixed-layer depth when deepening. A value of 0 instantaneously sets the running mean to the current value of BLD. Provides mesoscale temporal persistence."
+					description="timescale for secondary (slower) two-timescale running mean filter applied to pre-filtered boundary layer depth when deepening. A value of 2.592E+06 s is 30 days. Provides mesoscale temporal persistence."
 					possible_values="positive real (seconds), typically 86400-604800, or 0.0 for no filtering"
 		/>
-		<nml_option name="config_submesoscale_mld_decaying_tfilt" type="real" default_value="2.592E+06" units="s"
-					description="timescale for secondary (slower) two-timescale running mean filter applied to mixed-layer depth when shoaling. A value of 2.592E+06 s is 30 days. Provides mesoscale temporal persistence."
+		<nml_option name="config_submesoscale_mld_decaying_tfilt" type="real" default_value="0.0" units="s"
+					description="timescale for secondary (slower) two-timescale running mean filter applied to pre-filtered boundary layer depth when shoaling. A value of 2.592E+06 s is 30 days. Provides mesoscale temporal persistence."
 					possible_values="positive real (seconds), typically 604800 (1 week) to 2.592E+06 (30 days) and longer"
 		/>
 	</nml_record>
