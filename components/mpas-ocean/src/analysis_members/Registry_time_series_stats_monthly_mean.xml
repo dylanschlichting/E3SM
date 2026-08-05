@@ -227,5 +227,7 @@
 			<var_array name="totalFreshWaterTemperatureFlux"/>
 			<var name="icebergFreshWaterFlux"/>
 			<var name="icebergHeatFlux"/>
+			<var_array name="chiPhyVerTracer"/>
+			<var_array name="chiSpurTracerBR08"/>
 		</stream>
 	</streams>
