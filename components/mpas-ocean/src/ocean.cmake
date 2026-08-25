@@ -58,6 +58,7 @@ list(APPEND RAW_SOURCES
   core_ocean/shared/mpas_ocn_vel_hmix_del2.F
   core_ocean/shared/mpas_ocn_vel_hmix_leith.F
   core_ocean/shared/mpas_ocn_vel_hmix_del4.F
+  core_ocean/shared/mpas_ocn_gofs_coupling.F
   core_ocean/shared/mpas_ocn_vel_forcing.F
   core_ocean/shared/mpas_ocn_vel_forcing_surface_stress.F
   core_ocean/shared/mpas_ocn_vel_forcing_explicit_bottom_drag.F

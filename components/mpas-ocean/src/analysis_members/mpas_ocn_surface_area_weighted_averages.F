@@ -215,6 +215,7 @@ contains
       ! package flag
       logical, pointer :: activeTracersBulkRestoringPKG
       logical, pointer :: frazilIcePkgActive
+      logical, pointer :: windStressBulkPKGActive
 
       ! buffers data for message passaging
       integer :: kBuffer, kBufferLength
@@ -228,6 +229,7 @@ contains
       ! get status of other packages
       call mpas_pool_get_package(ocnPackages, 'activeTracersBulkRestoringPKGActive', activeTracersBulkRestoringPKG)
       call mpas_pool_get_package(ocnPackages, 'frazilIceActive', frazilIcePkgActive)
+      call mpas_pool_get_package(ocnPackages, 'windStressBulkPKGActive', windStressBulkPKGActive)
 
       ! set highest level pointer
       dminfo = domain % dminfo
@@ -319,8 +321,8 @@ contains
             call mpas_pool_get_array(tracersSurfaceFluxPool, 'activeTracersSurfaceFlux', activeTracersSurfaceFlux)
             if (activeTracersBulkRestoringPKG) call mpas_pool_get_array(forcingPool, 'seaIceSalinityFlux', seaIceSalinityFlux)
             call mpas_pool_get_array(forcingPool, 'surfaceStressMagnitude', surfaceStressMagnitude)
-            if (activeTracersBulkRestoringPKG) call mpas_pool_get_array(forcingPool, 'windStressZonal', windStressZonal)
-            if (activeTracersBulkRestoringPKG) call mpas_pool_get_array(forcingPool, 'windStressMeridional', windStressMeridional)
+            if (windStressBulkPKGActive) call mpas_pool_get_array(forcingPool, 'windStressZonal', windStressZonal)
+            if (windStressBulkPKGActive) call mpas_pool_get_array(forcingPool, 'windStressMeridional', windStressMeridional)
             call mpas_pool_get_array(forcingPool, 'atmosphericPressure', atmosphericPressure)
             call mpas_pool_get_array(statePool, 'ssh', ssh, 1)
             call mpas_pool_get_array(tracersPool, 'activeTracers', activeTracers, 1)
@@ -379,9 +381,9 @@ contains
             n = n + 1
             workArray(n,:) = surfaceStressMagnitude(:)
             n = n + 1
-            if (activeTracersBulkRestoringPKG) workArray(n,:) = windStressZonal(:)
+            if (windStressBulkPKGActive) workArray(n,:) = windStressZonal(:)
             n = n + 1
-            if (activeTracersBulkRestoringPKG) workArray(n,:) = windStressMeridional(:)
+            if (windStressBulkPKGActive) workArray(n,:) = windStressMeridional(:)
             n = n + 1
             workArray(n,:) = atmosphericPressure(:)
             n = n + 1
