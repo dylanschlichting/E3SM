@@ -225,7 +225,7 @@
 
       <modules compiler="intel">
         <command name="load">PrgEnv-intel/8.5.0</command>
-        <command name="load">intel/2024.1.0</command>
+        <command name="load">intel/2024.0</command>
       </modules>
 
       <modules compiler="nvidia">
@@ -582,7 +582,7 @@
 
       <modules compiler="intel">
         <command name="load">PrgEnv-intel/8.5.0</command>
-        <command name="load">intel/2024.1.0</command>
+        <command name="load">intel/2024.0</command>
       </modules>
 
       <modules compiler="nvidia">
@@ -942,7 +942,7 @@
 
       <modules compiler="intel">
         <command name="load">PrgEnv-intel/8.5.0</command>
-        <command name="load">intel/2024.1.0</command>
+        <command name="load">intel/2024.0</command>
       </modules>
 
       <modules compiler="nvidia">
