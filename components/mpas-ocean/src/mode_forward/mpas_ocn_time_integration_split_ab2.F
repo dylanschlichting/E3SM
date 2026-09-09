@@ -36,6 +36,7 @@ module ocn_time_integration_split_ab2
    use mpas_log
 
    use ocn_config
+   use ocn_constants, only : rho_sw
    use ocn_mesh
    use ocn_tendency
    use ocn_diagnostics_variables
@@ -102,7 +103,8 @@ module ocn_time_integration_split_ab2
    real (kind=RKIND) :: &
       useVelocityCorrection,&! mask for velocity correction
       splitFact, &! mask for terms in split cases
-      self_attraction_and_loading_beta
+      self_attraction_and_loading_beta, &
+      rho0gInv    ! 1/(rho_sw*gravity), converts surface pressure to head
 
     type(MPAS_Time_Type) :: nowTime ! Current model time
     character(len=STRKIND) :: initialTimeStamp, nowTimeStamp
@@ -1078,7 +1080,8 @@ module ocn_time_integration_split_ab2
                            tidalPotentialEta(iCell) - &
                         pgf_sal_on * pgf_sal(iCell) - &
                         (1.0_RKIND - pgf_sal_on) * self_attraction_and_loading_beta* &
-                              sshSubcycleCur(iCell)
+                             (sshSubcycleCur(iCell) + &
+                              rho0gInv*surfacePressure(iCell))
                   end do
                   !$omp end do
                   !$omp end parallel
@@ -1296,14 +1299,16 @@ module ocn_time_integration_split_ab2
                            tidalPotentialEta(iCell) - &
                         pgf_sal_on * pgf_sal(iCell) - &
                         (1.0_RKIND - pgf_sal_on) * self_attraction_and_loading_beta* &
-                              sshSubcycleCur(iCell)
+                             (sshSubcycleCur(iCell) + &
+                              rho0gInv*surfacePressure(iCell))
 
                      sshSubcycleNewWithTides(iCell) = &
                               sshSubcycleNew(iCell) - &
                            tidalPotentialEta(iCell) - &
                         pgf_sal_on * pgf_sal(iCell) - &
                         (1.0_RKIND - pgf_sal_on) * self_attraction_and_loading_beta* &
-                              sshSubcycleNew(iCell)
+                             (sshSubcycleNew(iCell) + &
+                              rho0gInv*surfacePressure(iCell))
                   end do
                   !$omp end do
                   !$omp end parallel
@@ -3222,6 +3227,13 @@ module ocn_time_integration_split_ab2
       endif
 
       self_attraction_and_loading_beta = config_self_attraction_and_loading_beta
+
+      ! Convert surface pressure to an equivalent head so that the scalar
+      ! SAL approximation acts on the pressure-adjusted sea level rather
+      ! than on bare ssh.  Under ice-shelf cavities ssh is the ice draft
+      ! (order -1000 m) and landIcePressure cancels it, leaving the
+      ! dynamic anomaly.  Matches ocn_vel_tidal_potential_tend.
+      rho0gInv = 1.0_RKIND / rho_sw / gravity
 
       !-----------------------------------------------------------------
       if ( config_do_restart ) then

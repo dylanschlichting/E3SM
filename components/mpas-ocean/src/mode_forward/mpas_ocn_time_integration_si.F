@@ -38,6 +38,7 @@ module ocn_time_integration_si
    use mpas_global_sum_mod
 
    use ocn_config
+   use ocn_constants, only : rho_sw
    use ocn_mesh
    use ocn_tendency
    use ocn_diagnostics_variables
@@ -106,7 +107,8 @@ module ocn_time_integration_si
 
    real (kind=RKIND) :: &
       useVelocityCorrection, & ! mask for velocity correction
-      self_attraction_and_loading_beta
+      self_attraction_and_loading_beta, &
+      rho0gInv    ! 1/(rho_sw*gravity), converts surface pressure to head
 
    ! Global variables for the split-implicit time stepper ---------------
    real (kind=RKIND), allocatable,dimension(:,:) :: &
@@ -1160,7 +1162,8 @@ module ocn_time_integration_si
  
                !$acc parallel loop gang  &
                !$acc    present(sshSubcycleCurWithTides,sshSubcycleCur, &
-               !$acc       tidalPotentialEta,pgf_sal,sshSubcycleCur)
+               !$acc       tidalPotentialEta,pgf_sal,sshSubcycleCur, &
+               !$acc       surfacePressure)
 #else
                !$omp parallel
                !$omp do schedule(runtime)
@@ -1171,7 +1174,8 @@ module ocn_time_integration_si
                         tidalPotentialEta(iCell) - &
                      pgf_sal_on * pgf_sal(iCell) - &
                      (1.0_RKIND - pgf_sal_on) * self_attraction_and_loading_beta* &
-                           sshSubcycleCur(iCell)
+                          (sshSubcycleCur(iCell) + &
+                           rho0gInv*surfacePressure(iCell))
                end do
 #ifndef MPAS_OPENACC
                !$omp end do
@@ -3508,6 +3512,13 @@ module ocn_time_integration_si
       endif
 
       self_attraction_and_loading_beta = config_self_attraction_and_loading_beta
+
+      ! Convert surface pressure to an equivalent head so that the scalar
+      ! SAL approximation acts on the pressure-adjusted sea level rather
+      ! than on bare ssh.  Under ice-shelf cavities ssh is the ice draft
+      ! (order -1000 m) and landIcePressure cancels it, leaving the
+      ! dynamic anomaly.  Matches ocn_vel_tidal_potential_tend.
+      rho0gInv = 1.0_RKIND / rho_sw / gravity
 
 
 #ifdef USE_GPU_AWARE_MPI
