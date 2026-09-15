@@ -1161,15 +1161,32 @@ def buildnml(case, caseroot, compname):
             lines.append('<stream name="harmonicAnalysisRestart"')
             lines.append('        type="input;output"')
             lines.append('        io_type="{}"'.format(ocn_pio_typename))
+            # The filename must advance with time so that each restart frame is
+            # its own file, exactly as the main restart stream does. With
+            # output_interval="none" the name never advanced: writes landed on
+            # the reference time while the restart read asked for the current
+            # restart time, so the read failed ("attempted to read non-existent
+            # file") and the accumulators silently restarted from zero. A static
+            # name is not the answer either - the file is then still open from
+            # the init read when the write comes, and PIO fails with "Operation
+            # not allowed in data mode". Setting output_interval to 1 second
+            # gives filename_interval a nonzero step so each frame is unique;
+            # the write itself is driven by the restart alarm, not this interval.
             lines.append('        filename_template="{}.mpaso{}.rst.am.harmonicAnalysis.$Y-$M-$D_$S.nc"'.format(casename, inst_string))
             lines.append('        filename_interval="output_interval"')
             lines.append('        clobber_mode="truncate"')
-            lines.append('        input_interval="none"')
+            # Must be read back on restart. The harmonic analysis accumulates a
+            # least-squares system over its whole window, which generally spans
+            # several run segments; with input_interval="none" the accumulators
+            # were written every restart and never restored, so the solve saw
+            # only the final segment.
+            lines.append('        input_interval="initial_only"')
             lines.append('        packages="harmonicAnalysisAMPKG"')
             lines.append('        reference_time="01-01-01_00:00:00"')
-            lines.append('        output_interval="none">')
+            lines.append('        output_interval="00-00-00_00:00:01">')
             lines.append('')
             lines.append('    <var name="xtime"/>')
+            lines.append('    <var name="sshInit"/>')
             lines.append('    <var name="leastSquaresLHSMatrix"/>')
             lines.append('    <var name="leastSquaresRHSVector"/>')
             lines.append('</stream>')

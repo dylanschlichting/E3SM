@@ -220,14 +220,20 @@ contains
                                         tidalConstituentType, &
                                         err)
 
+         ! On a cold start, zero the accumulators and set the reference SSH.
+         ! On a restart all three are restored from the harmonicAnalysisRestart
+         ! stream and must NOT be reinitialised: the least-squares fit
+         ! accumulates over the whole analysis window, which generally spans
+         ! several run segments. sshInit was previously reset unconditionally,
+         ! so the reference SSH jumped at every segment boundary.
          if (.not. config_do_restart) then
            leastSquaresRHSVector = 0.0_RKIND
            leastSquaresLHSMatrix = 0.0_RKIND
+
+           do iCell = 1,nCellSSolve
+             sshInit(iCell) = ssh(iCell)
+           end do
          end if
-           
-         do iCell = 1,nCellSSolve
-           sshInit(iCell) = ssh(iCell)
-         end do
 
          do iCon = 1,nAnalysisConstituents  
            call mpas_log_write('Constituent '//constituentList(iCon)%constituent)
