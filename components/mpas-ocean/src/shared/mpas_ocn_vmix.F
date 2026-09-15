@@ -978,7 +978,7 @@ contains
 
    subroutine ocn_vel_vmix_tend_implicit_spatially_variable_loglaw(forcingPool, dt, & !{{{
                                          kineticEnergyCell, layerThickEdgeDrag, layerThickEdgeMean, &
-                                         normalVelocity, vertViscTopOfEdge, err)
+                                         landIceEdgeFraction, normalVelocity, vertViscTopOfEdge, err)
 
       !-----------------------------------------------------------------
       !
@@ -998,6 +998,9 @@ contains
       real (kind=RKIND), dimension(:,:), intent(in) :: &
          layerThickEdgeDrag, &!< Input: thickness at edge for drag
          layerThickEdgeMean !< Input: mean thickness at edge
+
+      real (kind=RKIND), dimension(:), intent(in) :: &
+         landIceEdgeFraction !< Input: land ice fraction at edge
 
       !-----------------------------------------------------------------
       !
@@ -1046,8 +1049,8 @@ contains
       !$acc enter data create(bTemp, C, rTemp)
 
       !$acc parallel loop present(maxLevelEdgeTop, minLevelEdgeBot, cellsOnEdge, &
-      !$acc    layerThickEdgeMean, vertViscTopOfEdge, normalVelocity, &
-      !$acc    kineticEnergyCell, bottomDepth) &
+      !$acc    layerThickEdgeMean, layerThickEdgeDrag, vertViscTopOfEdge, normalVelocity, &
+      !$acc    kineticEnergyCell, bottomDepth, landIceEdgeFraction) &
       !$acc    private(Nsurf, N, cell1, cell2, CdTemp, A, bTemp, C, m, rTemp, k)
 #else
       !$omp do schedule(runtime)
@@ -1073,8 +1076,11 @@ contains
 
          ! one active layer
          if (N .eq. Nsurf) then
+           ! Single layer feels both the log-law bottom drag and, under an ice
+           ! shelf, the implicit top drag - matching the constant-Cd routine.
            normalVelocity(N,iEdge) = normalVelocity(N,iEdge)  &
-                / (1.0_RKIND + dt*CdTemp(N) &
+                / (1.0_RKIND + dt*(CdTemp(N) &
+                   + implicitTopDragCoef * landIceEdgeFraction(iEdge)) &
                    * sqrt(kineticEnergyCell(N,cell1) + kineticEnergyCell(N,cell2)) / layerThickEdgeDrag(N,iEdge) )
          else
            do k = Nsurf+1, N
@@ -1089,8 +1095,12 @@ contains
            C(Nsurf)     = -2.0_RKIND*dt*vertViscTopOfEdge(Nsurf+1,iEdge) &
                       / (layerThickEdgeMean(Nsurf,iEdge) + layerThickEdgeMean(Nsurf+1,iEdge)) &
                       / layerThickEdgeMean(Nsurf,iEdge)
+           ! Surface layer: log-law drag (nonzero only if this layer lies within
+           ! zDrag_max of the bed) plus implicit top drag under an ice shelf.
            bTemp(Nsurf) = 1.0_RKIND - C(Nsurf) &
-                     + dt * CdTemp(Nsurf) * sqrt(kineticEnergyCell(Nsurf,cell1) + kineticEnergyCell(Nsurf,cell2)) &
+                     + dt * (CdTemp(Nsurf) &
+                             + implicitTopDragCoef * landIceEdgeFraction(iEdge)) &
+                     * sqrt(kineticEnergyCell(Nsurf,cell1) + kineticEnergyCell(Nsurf,cell2)) &
                      / layerThickEdgeMean(Nsurf,iEdge)
            rTemp(Nsurf) = normalVelocity(Nsurf,iEdge)
 
@@ -1513,8 +1523,8 @@ contains
       case (dragTypeLogLaw)
 
         call ocn_vel_vmix_tend_implicit_spatially_variable_loglaw(forcingPool, dt, &
-          kineticEnergyCell, layerThickEdgeDrag, layerThickEdgeMean, normalVelocity, &
-          vertViscTopOfEdge, err)
+          kineticEnergyCell, layerThickEdgeDrag, layerThickEdgeMean, landIceEdgeFraction, &
+          normalVelocity, vertViscTopOfEdge, err)
 
       case (dragTypeVariable)
 
@@ -1720,9 +1730,10 @@ contains
               & 'implicit bottom drag', MPAS_LOG_CRIT)
       endif
       if (config_use_implicit_top_drag .and. &
-          .not. trim(config_implicit_bottom_drag_type)=='constant') then
+          .not. (trim(config_implicit_bottom_drag_type)=='constant' .or. &
+                 trim(config_implicit_bottom_drag_type)=='loglaw')) then
          call mpas_log_write('Implicit top drag can only be used with ' //&
-              & 'constant implicit bottom drag type', MPAS_LOG_CRIT)
+              & 'constant or loglaw implicit bottom drag type', MPAS_LOG_CRIT)
       endif
 
       rayleighDampingCoef = 0.0_RKIND
